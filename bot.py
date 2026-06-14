@@ -89,7 +89,7 @@ T = {
         "btn_custom_time":"⏰ Указать период",
         "ask_time_from":  "⏰ Введите время *С* (например: 10:00)",
         "ask_time_to":    "Введите время *ДО* (например: 14:00)",
-        "order_done":     "✅ *Заявка принята!*\n\nМы перезвоним вам в течение 30 минут.\n\nНомер заявки: *#{num}*",
+        "order_done":     "✅ *Заявка принята!*\n\nМы перезвоним вам в течение 30 минут.\n\nНомер заявки: *#{num}*\n\nВам позвонят с номеров:\n📞 +998 79 222-12-21\n📞 +998 88 200-12-21\n📞 +998 94 738-04-44",
         "order_rejected": "❌ К сожалению, заявка *{num}* не может быть выполнена.\n\nПозвоните нам:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Новая заявка #{num}* (бот)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *Прайс-лист ARTEZ*\n\n🧺 Стандартная чистка — 12 000 сум/м²\n✨ Глубокая химчистка — 16 000 сум/м²\n🛋 Бытовая техника/Понка — от 16 000 сум/шт\n🌿 Сухая чистка — 14 000 сум/м²\n\n📦 Минимальный заказ — 10 м²\n🚚 Вывоз и доставка — *бесплатно*",
@@ -157,7 +157,7 @@ T = {
         "btn_custom_time":"⏰ Vaqt oralig'ini ko'rsatish",
         "ask_time_from":  "⏰ *Dan* vaqtini kiriting (masalan: 10:00)",
         "ask_time_to":    "*Gacha* vaqtini kiriting (masalan: 14:00)",
-        "order_done":     "✅ *Ariza qabul qilindi!*\n\n30 daqiqa ichida qayta qo'ng'iroq qilamiz.\n\nAriza raqami: *#{num}*",
+        "order_done":     "✅ *Ariza qabul qilindi!*\n\n30 daqiqa ichida qayta qo'ng'iroq qilamiz.\n\nAriza raqami: *#{num}*\n\nSizga quyidagi raqamlardan qo'ng'iroq qilishadi:\n📞 +998 79 222-12-21\n📞 +998 88 200-12-21\n📞 +998 94 738-04-44",
         "order_rejected": "❌ Afsuski, *{num}* arizasi bajarilishi mumkin emas.\n\nBizga qo'ng'iroq qiling:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Yangi ariza #{num}* (bot)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *ARTEZ narx-navo*\n\n🧺 Standart tozalash — 12 000 so'm/m²\n✨ Chuqur kimyoviy — 16 000 so'm/m²\n🛋 Maishiy texnika/Ponka — 16 000 so'mdan/dona\n🌿 Quruq tozalash — 14 000 so'm/m²\n\n📦 Minimal buyurtma — 10 m²\n🚚 Olib ketish va yetkazish — *bepul*",
@@ -307,11 +307,8 @@ def date_kb(uid):
     today    = date.today().strftime("%d.%m.%Y")
     tomorrow = (date.today() + timedelta(days=1)).strftime("%d.%m.%Y")
     return InlineKeyboardMarkup(inline_keyboard=[
-        [
-            InlineKeyboardButton(text=t(uid,"btn_today")    + f" ({today})",    callback_data=f"date_{today}"),
-            InlineKeyboardButton(text=t(uid,"btn_tomorrow") + f" ({tomorrow})", callback_data=f"date_{tomorrow}"),
-        ],
-        [InlineKeyboardButton(text=t(uid,"btn_pick_date"), callback_data="date_pick")],
+        [InlineKeyboardButton(text=t(uid,"btn_today")    + f" ({today})",    callback_data=f"date_{today}")],
+        [InlineKeyboardButton(text=t(uid,"btn_tomorrow") + f" ({tomorrow})", callback_data=f"date_{tomorrow}")],
         [InlineKeyboardButton(text=t(uid,"btn_cancel"),    callback_data="cancel_order")],
     ])
 
@@ -338,14 +335,16 @@ async def send_to_sheets(data: dict):
     except Exception as e:
         logging.warning(f"Sheets error: {e}")
 
-async def notify_group(text: str, order_num: int = None, client_id: int = None):
+async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None):
     """Отправляет заявку в группу сотрудников с кнопками действий"""
     kb = None
     if order_num and client_id:
+        call_button = InlineKeyboardButton(text="📞 Позвонить", url=f"tel:{phone}") if phone else \
+                      InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}")
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="✅ Принять заказ",  callback_data=f"accept_{order_num}_{client_id}"),
-                InlineKeyboardButton(text="📞 Позвонить",      callback_data=f"call_{order_num}_{client_id}"),
+                call_button,
             ],
             [
                 InlineKeyboardButton(text="🚗 Назначить водителя", callback_data=f"driver_{order_num}_{client_id}"),
@@ -640,7 +639,7 @@ async def order_service(cb: CallbackQuery, state: FSMContext):
     await cb.message.answer(t(uid,"ask_date"), reply_markup=date_kb(uid))
 
 # ── ДАТА — кнопки Сегодня/Завтра ──
-@dp.callback_query(F.data.startswith("date_") & ~F.data.eq("date_pick"))
+@dp.callback_query(F.data.startswith("date_"))
 async def order_date_btn(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     date_val = cb.data.replace("date_","")
@@ -648,86 +647,6 @@ async def order_date_btn(cb: CallbackQuery, state: FSMContext):
     await state.set_state(OrderForm.time)
     await cb.message.answer(t(uid,"ask_time"), reply_markup=time_kb(uid))
 
-# ── ДАТА — кнопка «Выбрать дату» ──
-@dp.callback_query(F.data == "date_pick")
-async def order_date_pick(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    # Генерируем inline-календарь на текущий месяц
-    from datetime import date as dt_date
-    today = dt_date.today()
-    await cb.message.answer(
-        t(uid,"ask_date_manual"),
-        reply_markup=build_calendar(uid, today.year, today.month)
-    )
-
-def build_calendar(uid, year, month):
-    import calendar
-    from datetime import date as dt_date
-    cal = calendar.monthcalendar(year, month)
-    month_names_ru = ["","Январь","Февраль","Март","Апрель","Май","Июнь",
-                      "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"]
-    month_names_uz = ["","Yanvar","Fevral","Mart","Aprel","May","Iyun",
-                      "Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"]
-    month_name = month_names_uz[month] if user_lang.get(uid,"ru")=="uz" else month_names_ru[month]
-    rows = []
-    # Заголовок с навигацией
-    rows.append([
-        InlineKeyboardButton(text="◀️", callback_data=f"cal_prev_{year}_{month}"),
-        InlineKeyboardButton(text=f"{month_name} {year}", callback_data="ignore"),
-        InlineKeyboardButton(text="▶️", callback_data=f"cal_next_{year}_{month}"),
-    ])
-    # Дни недели
-    days_ru = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
-    days_uz = ["Du","Se","Ch","Pa","Ju","Sh","Ya"]
-    days = days_uz if user_lang.get(uid,"ru")=="uz" else days_ru
-    rows.append([InlineKeyboardButton(text=d, callback_data="ignore") for d in days])
-    # Числа
-    today = dt_date.today()
-    for week in cal:
-        row = []
-        for day in week:
-            if day == 0:
-                row.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
-            else:
-                d = dt_date(year, month, day)
-                if d < today:
-                    row.append(InlineKeyboardButton(text=f"·{day}·", callback_data="ignore"))
-                else:
-                    date_str = d.strftime("%d.%m.%Y")
-                    row.append(InlineKeyboardButton(text=str(day), callback_data=f"calday_{date_str}"))
-        rows.append(row)
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-@dp.callback_query(F.data.startswith("cal_prev_"))
-async def cal_prev(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    _, _, year, month = cb.data.split("_")
-    year, month = int(year), int(month)
-    month -= 1
-    if month < 1: month = 12; year -= 1
-    await cb.message.edit_reply_markup(reply_markup=build_calendar(uid, year, month))
-
-@dp.callback_query(F.data.startswith("cal_next_"))
-async def cal_next(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    _, _, year, month = cb.data.split("_")
-    year, month = int(year), int(month)
-    month += 1
-    if month > 12: month = 1; year += 1
-    await cb.message.edit_reply_markup(reply_markup=build_calendar(uid, year, month))
-
-@dp.callback_query(F.data.startswith("calday_"))
-async def cal_day(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    date_val = cb.data.replace("calday_","")
-    user_data_db[uid]["date"] = date_val
-    await cb.message.delete()
-    await state.set_state(OrderForm.time)
-    await cb.message.answer(t(uid,"ask_time"), reply_markup=time_kb(uid))
-
-@dp.callback_query(F.data == "ignore")
-async def ignore_cb(cb: CallbackQuery):
-    await cb.answer()
 
 @dp.callback_query(F.data.in_({"time_morning","time_evening","time_custom"}))
 async def order_time(cb: CallbackQuery, state: FSMContext):
@@ -818,7 +737,9 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         f"━━━━━━━━━━━━━━━\n"
         f"🕒 {dt}"
     )
-    await notify_group(summary, order_num=order_num, client_id=uid)
+    raw_phone = (d.get("phone","") or "").strip()
+    client_phone = re.sub(r"[\s\-]", "", raw_phone)
+    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone)
 
     # В Google Таблицу
     await send_to_sheets({
