@@ -353,12 +353,12 @@ async def notify_group(text: str, order_num: int = None, client_id: int = None):
             ]
         ])
     try:
-        await bot.send_message(GROUP_ID, text, parse_mode="Markdown", reply_markup=kb)
+        await bot.send_message(GROUP_ID, text, reply_markup=kb)
     except Exception as e:
         logging.warning(f"Group notify error: {e}")
         # Если не получилось в группу — отправляем лично
         try:
-            await bot.send_message(ADMIN_ID, text, parse_mode="Markdown", reply_markup=kb)
+            await bot.send_message(ADMIN_ID, text, reply_markup=kb)
         except Exception as e2:
             logging.warning(f"Admin notify error: {e2}")
 
@@ -453,7 +453,7 @@ async def operator_message(msg: Message, state: FSMContext):
     text = (
         f"💬 *Сообщение от клиента*\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"👤 {md_escape(fullname)}" + (f" | @{username}" if username else "") + "\n"
+        f"👤 {md_escape(fullname)}" + (f" | @{md_escape(username)}" if username else "") + "\n"
         f"🆔 `{uid}`\n"
         f"━━━━━━━━━━━━━━━\n"
         f"📝 {md_escape(msg.text)}\n"
@@ -803,10 +803,10 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
     # Уведомление в группу
     loc = d.get("location","") or "—"
     summary = (
-        f"📋 *Новая заявка {order_num}* (бот)\n"
+        f"📋 Новая заявка {order_num} (бот)\n"
         f"━━━━━━━━━━━━━━━\n"
         f"👤 {md_escape(d.get('name',''))} | TG: {md_escape(tg_name)}\n"
-        f"🆔 `{uid}`" + (f" @{username}" if username else "") + "\n"
+        f"🆔 `{uid}`" + (f" @{md_escape(username)}" if username else "") + "\n"
         f"📞 {md_escape(d.get('phone',''))}\n"
         f"🏢 {md_escape(d.get('branch_name',''))}\n"
         f"📍 {md_escape(d.get('city',''))}\n"
