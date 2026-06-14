@@ -14,7 +14,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price, add_staff, remove_staff, get_staff_by_role
 
 logging.basicConfig(level=logging.INFO)
 
@@ -1026,28 +1026,103 @@ async def group_driver(cb: CallbackQuery):
     parts     = cb.data.split("_")
     order_num = parts[1]
     client_id = parts[2]
-    w = cb.from_user
-    wname = f"{w.first_name or ''} {w.last_name or ''}".strip()
-    # Водитель — тот кто нажал кнопку
+
+    drivers = await get_staff_by_role("driver")
+    if not drivers:
+        await cb.answer("⚠️ Список водителей пуст. Добавьте их командой /add_driver", show_alert=True)
+        return
+
+    rows = list(cb.message.reply_markup.inline_keyboard) if cb.message.reply_markup else []
+    # Убираем строку с кнопкой "Назначить водителя" / "Отклонить", оставляем остальное (например "Принял")
+    rows = [r for r in rows if not any(
+        (btn.callback_data or "").startswith(("driver_", "reject_")) for btn in r
+    )]
+    for d in drivers:
+        fname = f"{d['first_name'] or ''} {d['last_name'] or ''}".strip() or f"id{d['tg_id']}"
+        rows.append([InlineKeyboardButton(
+            text=f"🚗 {fname}",
+            callback_data=f"setdriver_{order_num}_{client_id}_{d['tg_id']}"
+        )])
+    rows.append([InlineKeyboardButton(text="◀️ Назад", callback_data=f"backdriver_{order_num}_{client_id}")])
+
+    await cb.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("backdriver_"))
+async def group_driver_back(cb: CallbackQuery):
+    parts     = cb.data.split("_")
+    order_num = parts[1]
+    client_id = parts[2]
+
+    rows = list(cb.message.reply_markup.inline_keyboard) if cb.message.reply_markup else []
+    # Убираем строки с выбором водителя и "Назад"
+    rows = [r for r in rows if not any(
+        (btn.callback_data or "").startswith(("setdriver_", "backdriver_")) for btn in r
+    )]
+    already_accepted = any(
+        (btn.callback_data or "") == "done" and "Принял" in (btn.text or "")
+        for r in rows for btn in r
+    )
+    if already_accepted:
+        rows.append([InlineKeyboardButton(text="🚗 Назначить водителя", callback_data=f"driver_{order_num}_{client_id}")])
+    else:
+        rows.append([
+            InlineKeyboardButton(text="🚗 Назначить водителя", callback_data=f"driver_{order_num}_{client_id}"),
+            InlineKeyboardButton(text="❌ Отклонить",          callback_data=f"reject_{order_num}_{client_id}"),
+        ])
+    await cb.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+    await cb.answer()
+
+@dp.callback_query(F.data.startswith("setdriver_"))
+async def group_set_driver(cb: CallbackQuery):
+    parts        = cb.data.split("_")
+    order_num    = parts[1]
+    client_id    = parts[2]
+    driver_tg_id = int(parts[3])
+
+    drivers = await get_staff_by_role("driver")
+    driver  = next((d for d in drivers if d["tg_id"] == driver_tg_id), None)
+    if not driver:
+        await cb.answer("⚠️ Водитель не найден", show_alert=True)
+        return
+
+    dname = f"{driver['first_name'] or ''} {driver['last_name'] or ''}".strip() or f"id{driver_tg_id}"
+    chooser = cb.from_user
+    chooser_name = f"{chooser.first_name or ''} {chooser.last_name or ''}".strip()
+
     await update_order_status(
         order_num=order_num, new_status="pickup",
-        by_tg_id=w.id, by_name=wname,
-        note=f"Водитель {wname} назначен на вывоз",
+        by_tg_id=chooser.id, by_name=chooser_name,
+        note=f"{chooser_name} назначил водителем: {dname}",
         extra={
-            "driver_pickup_tg_id": w.id,
-            "driver_pickup_username": w.username or "",
-            "driver_pickup_first_name": w.first_name or "",
-            "driver_pickup_last_name": w.last_name or "",
+            "driver_pickup_tg_id": driver["tg_id"],
+            "driver_pickup_username": driver["tg_username"] or "",
+            "driver_pickup_first_name": driver["first_name"] or "",
+            "driver_pickup_last_name": driver["last_name"] or "",
             "pickup_at": now_local().replace(tzinfo=None),
         }
     )
-    await cb.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(
-            text=f"🚗 Водитель: {wname}" + (f" @{w.username}" if w.username else ""),
-            callback_data="done"
-        )]
-    ]))
-    await cb.answer(f"Вы назначены водителем на заказ {order_num}", show_alert=True)
+
+    rows = list(cb.message.reply_markup.inline_keyboard) if cb.message.reply_markup else []
+    rows = [r for r in rows if not any(
+        (btn.callback_data or "").startswith(("setdriver_", "backdriver_")) for btn in r
+    )]
+    rows.append([InlineKeyboardButton(
+        text=f"🚗 Водитель: {dname}" + (f" @{driver['tg_username']}" if driver["tg_username"] else ""),
+        callback_data="done"
+    )])
+    await cb.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=rows))
+
+    try:
+        await bot.send_message(driver["tg_id"],
+            f"🚗 Вам назначен заказ *{order_num}* на вывоз/доставку.",
+            parse_mode="Markdown"
+        )
+    except Exception as e:
+        logging.warning(f"Driver notify error: {e}")
+
+    await cb.answer(f"Водитель {dname} назначен на заказ {order_num}", show_alert=True)
+
 
 @dp.callback_query(F.data.startswith("reject_"))
 async def group_reject(cb: CallbackQuery):
@@ -1161,6 +1236,73 @@ async def cmd_setprice(msg: Message):
         )
     else:
         await msg.answer("⚠️ Не удалось обновить цену (БД недоступна).")
+
+# ── АДМИН: ВОДИТЕЛИ ──
+@dp.message(Command("add_driver"))
+async def cmd_add_driver(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    args = (msg.text or "").split(maxsplit=2)[1:]
+    if len(args) < 2:
+        await msg.answer(
+            "⚠️ Формат: `/add_driver <tg_id> <Имя> [Фамилия]`\n"
+            "Пример: `/add_driver 624826036 Ботир Каримов`",
+            parse_mode="Markdown"
+        )
+        return
+    try:
+        tg_id = int(args[0])
+    except ValueError:
+        await msg.answer("⚠️ tg_id должен быть числом.")
+        return
+    name_parts = args[1].split(maxsplit=1)
+    first_name = name_parts[0]
+    last_name  = name_parts[1] if len(name_parts) > 1 else ""
+    ok = await add_staff(tg_id=tg_id, first_name=first_name, last_name=last_name, role="driver")
+    if ok:
+        await msg.answer(f"✅ Водитель добавлен: {first_name} {last_name} (id {tg_id})")
+    else:
+        await msg.answer("⚠️ Не удалось добавить водителя (БД недоступна).")
+
+@dp.message(Command("del_driver"))
+async def cmd_del_driver(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    args = (msg.text or "").split()[1:]
+    if len(args) != 1:
+        await msg.answer("⚠️ Формат: `/del_driver <tg_id>`", parse_mode="Markdown")
+        return
+    try:
+        tg_id = int(args[0])
+    except ValueError:
+        await msg.answer("⚠️ tg_id должен быть числом.")
+        return
+    ok = await remove_staff(tg_id)
+    if ok:
+        await msg.answer(f"✅ Водитель (id {tg_id}) удалён из списка.")
+    else:
+        await msg.answer("⚠️ Водитель с таким id не найден.")
+
+@dp.message(Command("drivers"))
+async def cmd_drivers(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    drivers = await get_staff_by_role("driver")
+    if not drivers:
+        await msg.answer(
+            "📋 Список водителей пуст.\n\n"
+            "Добавить: `/add_driver <tg_id> <Имя> [Фамилия]`",
+            parse_mode="Markdown"
+        )
+        return
+    lines = ["🚗 *Водители:*", ""]
+    for d in drivers:
+        uname = f" @{d['tg_username']}" if d["tg_username"] else ""
+        lines.append(f"• {d['first_name']} {d['last_name'] or ''} (id `{d['tg_id']}`){uname}".replace("  ", " "))
+    lines.append("")
+    lines.append("Удалить: `/del_driver <tg_id>`")
+    await msg.answer("\n".join(lines), parse_mode="Markdown")
+
 
 # ── ЗАПУСК ──
 async def main():

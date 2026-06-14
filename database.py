@@ -405,3 +405,46 @@ async def set_price(service_key: str, type_key: str, price: int, unit: str = Non
                     updated_at = NOW()
             """, service_key, type_key, price)
     return True
+
+
+# ══════════════════════════════════════
+#  СОТРУДНИКИ (водители и т.п.)
+# ══════════════════════════════════════
+async def add_staff(tg_id: int, first_name: str, role: str = "driver", last_name: str = "", tg_username: str = "") -> bool:
+    """Добавляет или обновляет сотрудника. Возвращает True при успехе."""
+    if not pool:
+        return False
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO staff (tg_id, tg_username, first_name, last_name, role, is_active)
+            VALUES ($1, $2, $3, $4, $5, TRUE)
+            ON CONFLICT (tg_id) DO UPDATE SET
+                first_name  = EXCLUDED.first_name,
+                last_name   = EXCLUDED.last_name,
+                tg_username = EXCLUDED.tg_username,
+                role        = EXCLUDED.role,
+                is_active   = TRUE
+        """, tg_id, tg_username, first_name, last_name, role)
+    return True
+
+
+async def remove_staff(tg_id: int) -> bool:
+    """Деактивирует сотрудника (is_active=FALSE)."""
+    if not pool:
+        return False
+    async with pool.acquire() as conn:
+        result = await conn.execute(
+            "UPDATE staff SET is_active=FALSE WHERE tg_id=$1", tg_id
+        )
+    return result != "UPDATE 0"
+
+
+async def get_staff_by_role(role: str):
+    """Возвращает список активных сотрудников с указанной ролью."""
+    if not pool:
+        return []
+    async with pool.acquire() as conn:
+        return await conn.fetch(
+            "SELECT * FROM staff WHERE role=$1 AND is_active=TRUE ORDER BY first_name",
+            role
+        )
