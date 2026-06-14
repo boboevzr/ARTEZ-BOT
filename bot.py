@@ -357,9 +357,9 @@ async def notify_group(text: str, order_num: int = None, client_id: int = None, 
     """Отправляет заявку в группу сотрудников с кнопками действий"""
     kb = None
     if order_num and client_id:
-        tel_phone = (phone or "").strip()
-        call_button = InlineKeyboardButton(text="📞 Позвонить", url=f"tel:{tel_phone}") if phone else \
-                      InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}")
+        clean_phone = (phone or "").strip()
+        call_button = InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}_{clean_phone}") if phone else \
+                      InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}_")
         if username:
             msg_button = InlineKeyboardButton(text="✉️ Написать клиенту", url=f"https://t.me/{username}")
         else:
@@ -928,8 +928,13 @@ async def group_accept(cb: CallbackQuery):
 
 @dp.callback_query(F.data.startswith("call_"))
 async def group_call(cb: CallbackQuery):
-    num = cb.data.split("_")[1]
-    await cb.answer(f"Позвоните клиенту по номеру из заявки {num}", show_alert=True)
+    parts = cb.data.split("_", 3)
+    num = parts[1]
+    phone = parts[3] if len(parts) > 3 else ""
+    if phone:
+        await cb.answer(f"📞 Заявка {num}\nНомер клиента: {phone}", show_alert=True)
+    else:
+        await cb.answer(f"Номер не указан (заявка {num})", show_alert=True)
 
 @dp.callback_query(F.data.startswith("driver_"))
 async def group_driver(cb: CallbackQuery):
