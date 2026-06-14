@@ -172,6 +172,27 @@ async def upsert_client(tg_id, username, first_name, last_name, phone=None, lang
 # ══════════════════════════════════════
 #  ЗАКАЗЫ
 # ══════════════════════════════════════
+async def get_next_order_num(prefix: str = "ARTEZ") -> str:
+    """Возвращает следующий номер заказа на основе данных в БД (переживает редеплои)"""
+    if not pool:
+        return f"{prefix}-1001"
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT order_num FROM orders
+            WHERE order_num LIKE $1
+            ORDER BY id DESC
+            LIMIT 1
+        """, f"{prefix}-%")
+        if row and row["order_num"]:
+            try:
+                last_num = int(row["order_num"].split("-")[-1])
+            except (ValueError, IndexError):
+                last_num = 1000
+        else:
+            last_num = 1000
+        return f"{prefix}-{last_num + 1}"
+
+
 async def save_order(data: dict) -> str:
     if not pool: return data.get("order_num","")
     async with pool.acquire() as conn:

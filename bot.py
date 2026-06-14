@@ -13,7 +13,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num
 
 logging.basicConfig(level=logging.INFO)
 
@@ -181,7 +181,6 @@ PRICES = {"standard":12000,"deep":16000,"ponka":16000,"dry":14000}
 # ── Хранилище языков и данных ──
 user_lang    = {}
 user_data_db = {}
-order_counter = [1000]
 
 def lang(uid): return user_lang.get(uid, "ru")
 def t(uid, key): return T[lang(uid)].get(key, key)
@@ -740,9 +739,7 @@ async def order_time_to(msg: Message, state: FSMContext):
 
 async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, user_from=None):
     d = user_data_db.get(uid, {})
-    order_counter[0] += 1
-    num = order_counter[0]
-    order_num = f"ARTEZ-{num}"
+    order_num = await get_next_order_num()
     dt = datetime.now().strftime("%d.%m.%Y %H:%M")
     answer_fn = msg_or_cb.answer
 
