@@ -551,12 +551,12 @@ async def operator_message(msg: Message, state: FSMContext):
     tg_link = f"tg://user?id={uid}"
     text = (
         f"💬 *Сообщение от клиента*\n"
-        f"━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"👤 {md_escape(fullname)}" + (f" | @{md_escape(username)}" if username else "") + "\n"
         f"🆔 `{uid}`\n"
-        f"━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"📝 {md_escape(msg.text)}\n"
-        f"━━━━━━━━━━━━━━━"
+        f"━━━━━━━━━━"
     )
     reply_kb = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(
@@ -568,8 +568,12 @@ async def operator_message(msg: Message, state: FSMContext):
             url=tg_link
         )],
     ])
-    # Отправляем оператору (лично)
-    await bot.send_message(ADMIN_ID, text, parse_mode="Markdown", reply_markup=reply_kb)
+    # Отправляем в группу сотрудников
+    try:
+        await bot.send_message(GROUP_ID, text, parse_mode="Markdown", reply_markup=reply_kb)
+    except Exception as e:
+        logging.warning(f"Group notify error (operator msg): {e}")
+        await bot.send_message(ADMIN_ID, text, parse_mode="Markdown", reply_markup=reply_kb)
     # Подтверждение клиенту
     await msg.answer(t(uid,"operator_fwd"), reply_markup=back_kb(uid))
     await state.clear()
