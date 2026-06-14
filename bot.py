@@ -353,12 +353,17 @@ async def send_to_sheets(data: dict):
     except Exception as e:
         logging.warning(f"Sheets error: {e}")
 
-async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None):
+async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None, username: str = None):
     """Отправляет заявку в группу сотрудников с кнопками действий"""
     kb = None
     if order_num and client_id:
-        call_button = InlineKeyboardButton(text="📞 Позвонить", url=f"tel:{phone}") if phone else \
+        tel_phone = (phone or "").replace("+", "%2B")
+        call_button = InlineKeyboardButton(text="📞 Позвонить", url=f"tel:{tel_phone}") if phone else \
                       InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}")
+        if username:
+            msg_button = InlineKeyboardButton(text="✉️ Написать клиенту", url=f"https://t.me/{username}")
+        else:
+            msg_button = InlineKeyboardButton(text="✉️ Написать клиенту", url=f"tg://user?id={client_id}")
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="✅ Принять заказ",  callback_data=f"accept_{order_num}_{client_id}"),
@@ -367,7 +372,8 @@ async def notify_group(text: str, order_num: int = None, client_id: int = None, 
             [
                 InlineKeyboardButton(text="🚗 Назначить водителя", callback_data=f"driver_{order_num}_{client_id}"),
                 InlineKeyboardButton(text="❌ Отклонить",          callback_data=f"reject_{order_num}_{client_id}"),
-            ]
+            ],
+            [msg_button],
         ])
     try:
         await bot.send_message(GROUP_ID, text, reply_markup=kb)
@@ -840,7 +846,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         f"📋 Новая заявка {order_num} (бот)\n"
         f"━━━━━━━━━━━━━━━\n"
         f"👤 {md_escape(d.get('name',''))} | TG: {md_escape(tg_name)}\n"
-        f"🆔 `{uid}`" + (f" @{md_escape(username)}" if username else "") + "\n"
+        f"🆔 {uid}\n"
         f"📞 {md_escape(d.get('phone',''))}\n"
         f"🏢 {md_escape(d.get('branch_name',''))}\n"
         f"📍 {md_escape(d.get('city',''))}\n"
@@ -855,7 +861,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
     )
     raw_phone = (d.get("phone","") or "").strip()
     client_phone = re.sub(r"[\s\-]", "", raw_phone)
-    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone)
+    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone, username=username)
 
     # В Google Таблицу
     await send_to_sheets({
