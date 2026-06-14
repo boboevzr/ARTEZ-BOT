@@ -721,7 +721,7 @@ async def order_time(cb: CallbackQuery, state: FSMContext):
                                 reply_markup=cancel_kb(uid))
         return
     time_txt = t(uid,"btn_morning") if cb.data=="time_morning" else t(uid,"btn_evening")
-    await finish_order(cb.message, uid, time_txt, state)
+    await finish_order(cb.message, uid, time_txt, state, user_from=cb.from_user)
 
 @dp.message(OrderForm.time_from)
 async def order_time_from(msg: Message, state: FSMContext):
@@ -736,9 +736,9 @@ async def order_time_to(msg: Message, state: FSMContext):
     time_from = user_data_db[uid].get("time_from","")
     time_to   = msg.text
     time_txt  = f"{time_from} — {time_to}"
-    await finish_order(msg, uid, time_txt, state)
+    await finish_order(msg, uid, time_txt, state, user_from=msg.from_user)
 
-async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext):
+async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, user_from=None):
     d = user_data_db.get(uid, {})
     order_counter[0] += 1
     num = order_counter[0]
@@ -747,7 +747,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext):
     answer_fn = msg_or_cb.answer
 
     # Данные клиента из Telegram
-    user_obj = getattr(msg_or_cb, 'from_user', None)
+    user_obj = user_from or getattr(msg_or_cb, 'from_user', None)
     first_name = getattr(user_obj, 'first_name', '') or ''
     last_name  = getattr(user_obj, 'last_name',  '') or ''
     username   = getattr(user_obj, 'username',   '') or ''
