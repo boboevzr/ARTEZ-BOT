@@ -80,7 +80,7 @@ T = {
         "ask_date":       "📅 Выберите дату вывоза:",
         "btn_today":      "📅 Сегодня",
         "btn_tomorrow":   "📅 Завтра",
-        "btn_pick_date":  "🗓 Выбрать дату",
+        "btn_pick_date":  "🗓 Указать дату",
         "ask_date_manual":"✏️ Введите дату в формате ДД.ММ.ГГГГ\n\nПример: 20.06.2026",
         "date_invalid":   "⚠️ Неверный формат даты!\n\nВведите в формате ДД.ММ.ГГГГ\nПример: 20.06.2026",
         "ask_time":       "🕐 Выберите удобное время:",
@@ -152,7 +152,7 @@ T = {
         "ask_date":       "📅 Olib ketish sanasini tanlang:",
         "btn_today":      "📅 Bugun",
         "btn_tomorrow":   "📅 Ertaga",
-        "btn_pick_date":  "🗓 Sanani tanlash",
+        "btn_pick_date":  "🗓 Sanani kiritish",
         "ask_date_manual":"✏️ Sanani KK.OO.YYYY formatida kiriting\n\nMisol: 20.06.2026",
         "date_invalid":   "⚠️ Sana formati noto'g'ri!\n\nKK.OO.YYYY formatida kiriting\nMisol: 20.06.2026",
         "ask_time":       "🕐 Qulay vaqtni tanlang:",
@@ -357,7 +357,7 @@ async def notify_group(text: str, order_num: int = None, client_id: int = None, 
     """Отправляет заявку в группу сотрудников с кнопками действий"""
     kb = None
     if order_num and client_id:
-        tel_phone = (phone or "").replace("+", "%2B")
+        tel_phone = (phone or "").strip()
         call_button = InlineKeyboardButton(text="📞 Позвонить", url=f"tel:{tel_phone}") if phone else \
                       InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}")
         if username:
@@ -688,85 +688,34 @@ async def order_date_btn(cb: CallbackQuery, state: FSMContext):
     await state.set_state(OrderForm.time)
     await cb.message.answer(t(uid,"ask_time"), reply_markup=time_kb(uid))
 
-# ── ДАТА — кнопка «Указать дату» (календарь) ──
+# ── ДАТА — кнопка «Указать дату» (ручной ввод) ──
 @dp.callback_query(F.data == "date_pick")
 async def order_date_pick(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
-    from datetime import date as dt_date
-    today = dt_date.today()
-    await cb.message.answer(
-        t(uid,"ask_date_manual"),
-        reply_markup=build_calendar(uid, today.year, today.month)
-    )
+    await state.set_state(OrderForm.date)
+    await cb.message.answer(t(uid,"ask_date_manual"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
 
-def build_calendar(uid, year, month):
-    import calendar
-    from datetime import date as dt_date
-    cal = calendar.monthcalendar(year, month)
-    month_names_ru = ["","Январь","Февраль","Март","Апрель","Май","Июнь",
-                      "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"]
-    month_names_uz = ["","Yanvar","Fevral","Mart","Aprel","May","Iyun",
-                      "Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"]
-    month_name = month_names_uz[month] if user_lang.get(uid,"ru")=="uz" else month_names_ru[month]
-    rows = []
-    # Заголовок с навигацией
-    rows.append([
-        InlineKeyboardButton(text="◀️", callback_data=f"cal_prev_{year}_{month}"),
-        InlineKeyboardButton(text=f"{month_name} {year}", callback_data="ignore"),
-        InlineKeyboardButton(text="▶️", callback_data=f"cal_next_{year}_{month}"),
-    ])
-    # Дни недели
-    days_ru = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
-    days_uz = ["Du","Se","Ch","Pa","Ju","Sh","Ya"]
-    days = days_uz if user_lang.get(uid,"ru")=="uz" else days_ru
-    rows.append([InlineKeyboardButton(text=d, callback_data="ignore") for d in days])
-    # Числа
-    today = dt_date.today()
-    for week in cal:
-        row = []
-        for day in week:
-            if day == 0:
-                row.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
-            else:
-                d = dt_date(year, month, day)
-                if d < today:
-                    row.append(InlineKeyboardButton(text=f"·{day}·", callback_data="ignore"))
-                else:
-                    date_str = d.strftime("%d.%m.%Y")
-                    row.append(InlineKeyboardButton(text=str(day), callback_data=f"calday_{date_str}"))
-        rows.append(row)
-    return InlineKeyboardMarkup(inline_keyboard=rows)
-
-@dp.callback_query(F.data.startswith("cal_prev_"))
-async def cal_prev(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    _, _, year, month = cb.data.split("_")
-    year, month = int(year), int(month)
-    month -= 1
-    if month < 1: month = 12; year -= 1
-    await cb.message.edit_reply_markup(reply_markup=build_calendar(uid, year, month))
-
-@dp.callback_query(F.data.startswith("cal_next_"))
-async def cal_next(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    _, _, year, month = cb.data.split("_")
-    year, month = int(year), int(month)
-    month += 1
-    if month > 12: month = 1; year += 1
-    await cb.message.edit_reply_markup(reply_markup=build_calendar(uid, year, month))
-
-@dp.callback_query(F.data.startswith("calday_"))
-async def cal_day(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    date_val = cb.data.replace("calday_","")
-    user_data_db[uid]["date"] = date_val
-    await cb.message.delete()
+@dp.message(OrderForm.date)
+async def order_date_manual(msg: Message, state: FSMContext):
+    uid = msg.from_user.id
+    text = (msg.text or "").strip()
+    m = re.fullmatch(r"(\d{2})\.(\d{2})\.(\d{4})", text)
+    valid = False
+    if m:
+        day, month, year = int(m.group(1)), int(m.group(2)), int(m.group(3))
+        try:
+            from datetime import date as dt_date
+            d = dt_date(year, month, day)
+            if d >= dt_date.today():
+                valid = True
+        except ValueError:
+            valid = False
+    if not valid:
+        await msg.answer(t(uid,"date_invalid"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
+        return
+    user_data_db[uid]["date"] = text
     await state.set_state(OrderForm.time)
-    await cb.message.answer(t(uid,"ask_time"), reply_markup=time_kb(uid))
-
-@dp.callback_query(F.data == "ignore")
-async def ignore_cb(cb: CallbackQuery):
-    await cb.answer()
+    await msg.answer(t(uid,"ask_time"), reply_markup=time_kb(uid))
 
 
 @dp.callback_query(F.data.in_({"time_morning","time_evening","time_custom"}))
