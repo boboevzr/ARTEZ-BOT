@@ -14,7 +14,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price
 
 logging.basicConfig(level=logging.INFO)
 
@@ -106,7 +106,7 @@ T = {
         "operator_msg":   "💬 *Сообщение клиенту*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Заявка отменена. Возвращаемся в меню.",
         "btn_cancel":     "❌ Отмена",
-        "btn_svc_carpet":      "🧺 Чистка ковёр",
+        "btn_svc_carpet":      "🧺 Чистка ковра",
         "btn_svc_carpet_home": "🏠 Чистка ковра на дому",
         "btn_svc_sofa":        "🛋 Чистка диван, кресло",
         "btn_svc_mattress":    "🛏 Чистка матрас, одеяло",
@@ -202,7 +202,86 @@ CITIES = {
     }
 }
 
-PRICES = {"standard":12000,"deep":16000,"ponka":16000,"dry":14000}
+# Кэш цен из БД: {service_key: {type_key: {"price":.., "unit":..}}}
+PRICE_CACHE = {}
+
+# Дефолты на случай, если БД недоступна или таблица prices пуста
+DEFAULT_PRICES = {
+    "carpet":      {"standard": {"price": 12000, "unit": "sum/m2"}, "express": {"price": 16000, "unit": "sum/m2"}},
+    "carpet_home": {"standard": {"price": 14000, "unit": "sum/m2"}, "express": {"price": 18000, "unit": "sum/m2"}},
+    "sofa":        {"standard": {"price": 16000, "unit": "sum/m2"}, "express": {"price": 20000, "unit": "sum/m2"}},
+    "mattress":    {"standard": {"price": 16000, "unit": "sum/m2"}, "express": {"price": 20000, "unit": "sum/m2"}},
+    "curtains":    {"standard": {"price": 14000, "unit": "sum/m2"}, "express": {"price": 18000, "unit": "sum/m2"}},
+}
+
+async def load_prices():
+    """Загружает цены из БД в PRICE_CACHE. При ошибке/пустой БД использует дефолты."""
+    global PRICE_CACHE
+    try:
+        data = await get_all_prices()
+    except Exception as e:
+        logging.warning(f"load_prices error: {e}")
+        data = {}
+    if not data:
+        data = DEFAULT_PRICES
+    PRICE_CACHE = data
+
+def get_cached_price(service_key: str, type_key: str):
+    entry = PRICE_CACHE.get(service_key, {}).get(type_key)
+    if entry:
+        return entry["price"]
+    fallback = DEFAULT_PRICES.get(service_key, {}).get(type_key)
+    return fallback["price"] if fallback else 12000
+
+# Человекочитаемые названия услуг/типов для команд админа
+SERVICE_KEYS = ["carpet", "carpet_home", "sofa", "mattress", "curtains"]
+TYPE_KEYS    = ["standard", "express"]
+SERVICE_NAMES_RU = {
+    "carpet":      "Чистка ковра",
+    "carpet_home": "Чистка ковра на дому",
+    "sofa":        "Чистка диван/кресло",
+    "mattress":    "Чистка матрас/одеяло",
+    "curtains":    "Чистка штор",
+}
+TYPE_NAMES_RU = {"standard": "Стандартный", "express": "Быстрый"}
+
+SERVICE_NAMES_UZ = {
+    "carpet":      "Gilam tozalash",
+    "carpet_home": "Gilamni uyda tozalash",
+    "sofa":        "Divan/kreslo tozalash",
+    "mattress":    "Matras/ko'rpa tozalash",
+    "curtains":    "Parda tozalash",
+}
+TYPE_NAMES_UZ = {"standard": "Standart", "express": "Tezkor"}
+
+def build_prices_text(uid):
+    is_uz = lang(uid) == "uz"
+    names = SERVICE_NAMES_UZ if is_uz else SERVICE_NAMES_RU
+    types = TYPE_NAMES_UZ if is_uz else TYPE_NAMES_RU
+    title = "💰 *ARTEZ narx-navo*" if is_uz else "💰 *Прайс-лист ARTEZ*"
+    lines = [title, ""]
+    for svc in SERVICE_KEYS:
+        svc_name = names.get(svc, svc)
+        prices = PRICE_CACHE.get(svc, DEFAULT_PRICES.get(svc, {}))
+        parts = []
+        for tk in TYPE_KEYS:
+            entry = prices.get(tk)
+            if entry:
+                unit_raw = entry["unit"]
+                unit = "сум/м²" if (not is_uz and unit_raw == "sum/m2") else \
+                       ("so'm/m²" if (is_uz and unit_raw == "sum/m2") else unit_raw)
+                price_str = f"{entry['price']:,}".replace(",", " ")
+                parts.append(f"{types.get(tk, tk)}: {price_str} {unit}")
+        lines.append(f"🧺 *{svc_name}*\n   " + "\n   ".join(parts))
+    lines.append("")
+    if is_uz:
+        lines.append("📦 Minimal buyurtma — 10 m²")
+        lines.append("🚚 Olib ketish va yetkazish — *bepul*")
+    else:
+        lines.append("📦 Минимальный заказ — 10 м²")
+        lines.append("🚚 Вывоз и доставка — *бесплатно*")
+    return "\n".join(lines)
+
 
 # ── Хранилище языков и данных ──
 user_lang    = {}
@@ -232,6 +311,7 @@ class CalcForm(StatesGroup):
     width   = State()
     length  = State()
     service = State()
+    service_type = State()
 
 class OperatorForm(StatesGroup):
     message = State()
@@ -425,7 +505,7 @@ async def go_menu(cb: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "menu_prices")
 async def menu_prices(cb: CallbackQuery):
     uid = cb.from_user.id
-    await cb.message.answer(t(uid,"prices_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
+    await cb.message.answer(build_prices_text(uid), reply_markup=back_kb(uid), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "menu_branches")
 async def menu_branches(cb: CallbackQuery):
@@ -676,9 +756,11 @@ async def order_service_type(cb: CallbackQuery, state: FSMContext):
     await cb.message.answer(t(uid,"ask_date"), reply_markup=date_kb(uid))
 
 # ── ДАТА — кнопки Сегодня/Завтра ──
-@dp.callback_query(F.data.startswith("date_") & ~F.data.eq("date_pick"))
+@dp.callback_query(F.data.startswith("date_") & (F.data != "date_pick"))
 async def order_date_btn(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
+    if cb.data == "date_pick":
+        return await order_date_pick(cb, state)
     date_val = cb.data.replace("date_","")
     user_data_db[uid]["date"] = date_val
     await state.set_state(OrderForm.time)
@@ -869,18 +951,35 @@ async def calc_length(msg: Message, state: FSMContext):
 async def calc_service(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     svc = cb.data.replace("svc_","")
+    user_data_db[uid]["calc_svc"] = svc
+    await state.set_state(CalcForm.service_type)
+    await cb.message.answer(t(uid,"ask_service_type"), reply_markup=service_type_kb(uid))
+
+@dp.callback_query(CalcForm.service_type, F.data.startswith("svctype_"))
+async def calc_service_type(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    svctype = cb.data.replace("svctype_","")
     d   = user_data_db.get(uid,{})
+    svc = d.get("calc_svc","carpet")
     w   = d.get("calc_w",200)
     l   = d.get("calc_l",300)
     sqm_real = (w/100) * (l/100)
     sqm_bill = max(sqm_real, 10)
-    price    = PRICES.get(svc, 12000)
+    price    = get_cached_price(svc, svctype)
     total    = int(sqm_bill * price)
-    svc_map  = {"standard": t(uid,"btn_standard"), "deep": t(uid,"btn_deep"),
-                "ponka": t(uid,"btn_ponka"), "dry": t(uid,"btn_dry")}
+    svc_key_map = {
+        "carpet":      "btn_svc_carpet",
+        "carpet_home": "btn_svc_carpet_home",
+        "sofa":        "btn_svc_sofa",
+        "mattress":    "btn_svc_mattress",
+        "curtains":    "btn_svc_curtains",
+    }
+    type_key_map = {"standard": "btn_type_standard", "express": "btn_type_express"}
+    svc_name  = t(uid, svc_key_map.get(svc, "btn_svc_carpet"))
+    type_name = t(uid, type_key_map.get(svctype, "btn_type_standard"))
     result = t(uid,"calc_result").format(
         w=int(w), l=int(l), sqm=round(sqm_real,2),
-        svc=svc_map.get(svc,svc), price=f"{price:,}".replace(","," "),
+        svc=f"{svc_name} ({type_name})", price=f"{price:,}".replace(","," "),
         total=f"{total:,}".replace(","," ")
     )
     await cb.message.answer(result, reply_markup=back_kb(uid), parse_mode="Markdown")
@@ -998,7 +1097,7 @@ async def cmd_prices(msg: Message):
     uid = msg.from_user.id
     if uid not in user_lang:
         await msg.answer("👋", reply_markup=lang_kb()); return
-    await msg.answer(t(uid,"prices_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
+    await msg.answer(build_prices_text(uid), reply_markup=back_kb(uid), parse_mode="Markdown")
 
 @dp.message(Command("branches"))
 async def cmd_branches(msg: Message):
@@ -1007,10 +1106,67 @@ async def cmd_branches(msg: Message):
         await msg.answer("👋", reply_markup=lang_kb()); return
     await msg.answer(t(uid,"branches_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
 
+# ── АДМИН: ЦЕНЫ ──
+@dp.message(Command("prices_admin"))
+async def cmd_prices_admin(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    lines = ["💰 *Текущие цены* (ключ для /setprice)", ""]
+    for svc in SERVICE_KEYS:
+        prices = PRICE_CACHE.get(svc, DEFAULT_PRICES.get(svc, {}))
+        lines.append(f"*{SERVICE_NAMES_RU.get(svc, svc)}* (`{svc}`)")
+        for tk in TYPE_KEYS:
+            entry = prices.get(tk)
+            if entry:
+                lines.append(f"   {TYPE_NAMES_RU.get(tk, tk)} (`{tk}`): {entry['price']:,}".replace(",", " ") + " сум")
+        lines.append("")
+    lines.append("Изменить: `/setprice <услуга> <тип> <цена>`")
+    lines.append("Пример: `/setprice carpet standard 13000`")
+    await msg.answer("\n".join(lines), parse_mode="Markdown")
+
+@dp.message(Command("setprice"))
+async def cmd_setprice(msg: Message):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    args = (msg.text or "").split()[1:]
+    if len(args) != 3:
+        await msg.answer(
+            "⚠️ Формат: `/setprice <услуга> <тип> <цена>`\n"
+            f"Услуги: {', '.join(SERVICE_KEYS)}\n"
+            f"Типы: {', '.join(TYPE_KEYS)}\n"
+            "Пример: `/setprice carpet standard 13000`",
+            parse_mode="Markdown"
+        )
+        return
+    svc, tk, price_str = args
+    if svc not in SERVICE_KEYS:
+        await msg.answer(f"⚠️ Неизвестная услуга `{svc}`. Доступны: {', '.join(SERVICE_KEYS)}", parse_mode="Markdown")
+        return
+    if tk not in TYPE_KEYS:
+        await msg.answer(f"⚠️ Неизвестный тип `{tk}`. Доступны: {', '.join(TYPE_KEYS)}", parse_mode="Markdown")
+        return
+    try:
+        price = int(price_str)
+        if price <= 0:
+            raise ValueError
+    except ValueError:
+        await msg.answer("⚠️ Цена должна быть положительным целым числом.")
+        return
+    ok = await set_price(svc, tk, price)
+    if ok:
+        await load_prices()
+        await msg.answer(
+            f"✅ Цена обновлена: {SERVICE_NAMES_RU.get(svc, svc)} / {TYPE_NAMES_RU.get(tk, tk)} = "
+            f"{price:,}".replace(",", " ") + " сум"
+        )
+    else:
+        await msg.answer("⚠️ Не удалось обновить цену (БД недоступна).")
+
 # ── ЗАПУСК ──
 async def main():
     logging.info("🚀 ARTEZ Bot starting...")
     await init_db()
+    await load_prices()
     logging.info("✅ Bot started, polling...")
     await dp.start_polling(bot)
 

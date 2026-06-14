@@ -140,6 +140,19 @@ async def create_tables():
             created_at      TIMESTAMP DEFAULT NOW()
         );
 
+        -- ══════════════════════════════════════
+        --  ЦЕНЫ НА УСЛУГИ
+        -- ══════════════════════════════════════
+        CREATE TABLE IF NOT EXISTS prices (
+            id              SERIAL PRIMARY KEY,
+            service_key     VARCHAR(30) NOT NULL,   -- carpet, carpet_home, sofa, mattress, curtains
+            type_key        VARCHAR(20) NOT NULL,   -- standard, express
+            price           INT NOT NULL,
+            unit            VARCHAR(20) DEFAULT 'sum/m2',
+            updated_at      TIMESTAMP DEFAULT NOW(),
+            UNIQUE(service_key, type_key)
+        );
+
         -- Индексы
         CREATE INDEX IF NOT EXISTS idx_orders_client   ON orders(client_tg_id);
         CREATE INDEX IF NOT EXISTS idx_orders_status   ON orders(status);
@@ -147,6 +160,28 @@ async def create_tables():
         CREATE INDEX IF NOT EXISTS idx_orders_created  ON orders(created_at);
         CREATE INDEX IF NOT EXISTS idx_clients_tg_id   ON clients(tg_id);
         """)
+
+        # Дефолтные цены — добавляются только если таблица prices ещё пуста
+        count = await conn.fetchval("SELECT COUNT(*) FROM prices")
+        if count == 0:
+            defaults = [
+                ("carpet",      "standard", 12000, "sum/m2"),
+                ("carpet",      "express",  16000, "sum/m2"),
+                ("carpet_home", "standard", 14000, "sum/m2"),
+                ("carpet_home", "express",  18000, "sum/m2"),
+                ("sofa",        "standard", 16000, "sum/m2"),
+                ("sofa",        "express",  20000, "sum/m2"),
+                ("mattress",    "standard", 16000, "sum/m2"),
+                ("mattress",    "express",  20000, "sum/m2"),
+                ("curtains",    "standard", 14000, "sum/m2"),
+                ("curtains",    "express",  18000, "sum/m2"),
+            ]
+            await conn.executemany("""
+                INSERT INTO prices (service_key, type_key, price, unit)
+                VALUES ($1, $2, $3, $4)
+                ON CONFLICT (service_key, type_key) DO NOTHING
+            """, defaults)
+
     logging.info("✅ Tables created/verified")
 
 
@@ -315,3 +350,58 @@ async def get_stats(branch: str = None):
             FROM orders {where}
         """)
         return dict(row) if row else {}
+
+
+# ══════════════════════════════════════
+#  ЦЕНЫ НА УСЛУГИ
+# ══════════════════════════════════════
+async def get_all_prices() -> dict:
+    """Возвращает все цены в виде {service_key: {type_key: {"price":..,"unit":..}}}"""
+    if not pool:
+        return {}
+    async with pool.acquire() as conn:
+        rows = await conn.fetch("SELECT service_key, type_key, price, unit FROM prices")
+    result = {}
+    for r in rows:
+        result.setdefault(r["service_key"], {})[r["type_key"]] = {
+            "price": r["price"],
+            "unit": r["unit"],
+        }
+    return result
+
+
+async def get_price(service_key: str, type_key: str):
+    """Возвращает цену (int) для конкретной услуги и типа, либо None если не найдено"""
+    if not pool:
+        return None
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT price FROM prices WHERE service_key=$1 AND type_key=$2",
+            service_key, type_key
+        )
+    return row["price"] if row else None
+
+
+async def set_price(service_key: str, type_key: str, price: int, unit: str = None) -> bool:
+    """Устанавливает (или создаёт) цену для услуги/типа. Возвращает True при успехе."""
+    if not pool:
+        return False
+    async with pool.acquire() as conn:
+        if unit:
+            await conn.execute("""
+                INSERT INTO prices (service_key, type_key, price, unit, updated_at)
+                VALUES ($1, $2, $3, $4, NOW())
+                ON CONFLICT (service_key, type_key) DO UPDATE SET
+                    price = EXCLUDED.price,
+                    unit  = EXCLUDED.unit,
+                    updated_at = NOW()
+            """, service_key, type_key, price, unit)
+        else:
+            await conn.execute("""
+                INSERT INTO prices (service_key, type_key, price, updated_at)
+                VALUES ($1, $2, $3, NOW())
+                ON CONFLICT (service_key, type_key) DO UPDATE SET
+                    price = EXCLUDED.price,
+                    updated_at = NOW()
+            """, service_key, type_key, price)
+    return True
