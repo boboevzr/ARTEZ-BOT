@@ -32,6 +32,15 @@ TASHKENT_TZ = ZoneInfo("Asia/Tashkent")
 def now_local():
     return datetime.now(TASHKENT_TZ)
 
+def md_escape(text):
+    """Экранирует символы, которые ломают Telegram Markdown-разметку"""
+    if not text:
+        return ""
+    text = str(text)
+    for ch in ['_', '*', '[', ']', '`']:
+        text = text.replace(ch, f"\\{ch}")
+    return text
+
 # ══════════════════════════════════════
 #  ПЕРЕВОДЫ
 # ══════════════════════════════════════
@@ -442,10 +451,10 @@ async def operator_message(msg: Message, state: FSMContext):
     text = (
         f"💬 *Сообщение от клиента*\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"👤 {fullname}" + (f" | @{username}" if username else "") + "\n"
+        f"👤 {md_escape(fullname)}" + (f" | @{username}" if username else "") + "\n"
         f"🆔 `{uid}`\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"📝 {msg.text}\n"
+        f"📝 {md_escape(msg.text)}\n"
         f"━━━━━━━━━━━━━━━"
     )
     reply_kb = InlineKeyboardMarkup(inline_keyboard=[
@@ -495,7 +504,7 @@ async def admin_reply_send(msg: Message, state: FSMContext):
     try:
         await bot.send_message(
             client_id,
-            f"📩 *Сообщение от оператора ARTEZ*\n\n{msg.text}",
+            f"📩 *Сообщение от оператора ARTEZ*\n\n{md_escape(msg.text)}",
             parse_mode="Markdown"
         )
         await msg.answer(
@@ -794,16 +803,16 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
     summary = (
         f"📋 *Новая заявка {order_num}* (бот)\n"
         f"━━━━━━━━━━━━━━━\n"
-        f"👤 {d.get('name','')} | TG: {tg_name}\n"
+        f"👤 {md_escape(d.get('name',''))} | TG: {md_escape(tg_name)}\n"
         f"🆔 `{uid}`" + (f" @{username}" if username else "") + "\n"
-        f"📞 {d.get('phone','')}\n"
-        f"🏢 {d.get('branch_name','')}\n"
-        f"📍 {d.get('city','')}\n"
-        f"🏠 {d.get('address','')}\n"
-        f"🗺 {loc}\n"
-        f"🧺 {d.get('service','')}\n"
-        f"📅 {d.get('date','')}\n"
-        f"🕐 {time_txt}\n"
+        f"📞 {md_escape(d.get('phone',''))}\n"
+        f"🏢 {md_escape(d.get('branch_name',''))}\n"
+        f"📍 {md_escape(d.get('city',''))}\n"
+        f"🏠 {md_escape(d.get('address',''))}\n"
+        f"🗺 {md_escape(loc)}\n"
+        f"🧺 {md_escape(d.get('service',''))}\n"
+        f"📅 {md_escape(d.get('date',''))}\n"
+        f"🕐 {md_escape(time_txt)}\n"
         f"━━━━━━━━━━━━━━━\n"
         f"🕒 {dt}"
     )
