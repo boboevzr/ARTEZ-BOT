@@ -3,6 +3,7 @@ import logging
 import aiohttp
 import re
 from datetime import datetime
+from zoneinfo import ZoneInfo
 from aiogram import Bot, Dispatcher, F
 from aiogram.types import (
     Message, CallbackQuery,
@@ -24,6 +25,12 @@ SHEETS_URL  = os.getenv("SHEETS_URL", "https://script.google.com/macros/s/AKfycb
 
 bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher(storage=MemoryStorage())
+
+# ── Часовой пояс ──
+TASHKENT_TZ = ZoneInfo("Asia/Tashkent")
+
+def now_local():
+    return datetime.now(TASHKENT_TZ)
 
 # ══════════════════════════════════════
 #  ПЕРЕВОДЫ
@@ -740,7 +747,7 @@ async def order_time_to(msg: Message, state: FSMContext):
 async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, user_from=None):
     d = user_data_db.get(uid, {})
     order_num = await get_next_order_num()
-    dt = datetime.now().strftime("%d.%m.%Y %H:%M")
+    dt = now_local().strftime("%d.%m.%Y %H:%M")
     answer_fn = msg_or_cb.answer
 
     # Данные клиента из Telegram
@@ -896,7 +903,7 @@ async def group_accept(cb: CallbackQuery):
             "operator_username": w.username or "",
             "operator_first_name": w.first_name or "",
             "operator_last_name": w.last_name or "",
-            "accepted_at": datetime.now(),
+            "accepted_at": now_local().replace(tzinfo=None),
         }
     )
     await cb.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
@@ -937,7 +944,7 @@ async def group_driver(cb: CallbackQuery):
             "driver_pickup_username": w.username or "",
             "driver_pickup_first_name": w.first_name or "",
             "driver_pickup_last_name": w.last_name or "",
-            "pickup_at": datetime.now(),
+            "pickup_at": now_local().replace(tzinfo=None),
         }
     )
     await cb.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[
