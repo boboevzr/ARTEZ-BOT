@@ -106,10 +106,14 @@ T = {
         "operator_msg":   "💬 *Сообщение клиенту*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Заявка отменена. Возвращаемся в меню.",
         "btn_cancel":     "❌ Отмена",
-        "btn_standard":   "🧺 Стандартная — 12 000",
-        "btn_deep":       "✨ Химчистка — 16 000",
-        "btn_ponka":      "🛋 Понка — от 16 000",
-        "btn_dry":        "🌿 Сухая — 14 000",
+        "btn_svc_carpet":      "🧺 Чистка ковёр",
+        "btn_svc_carpet_home": "🏠 Чистка ковра на дому",
+        "btn_svc_sofa":        "🛋 Чистка диван, кресло",
+        "btn_svc_mattress":    "🛏 Чистка матрас, одеяло",
+        "btn_svc_curtains":    "🪟 Чистка штор",
+        "ask_service_type":    "Тип услуги:",
+        "btn_type_standard":   "🧺 Стандартный",
+        "btn_type_express":    "⚡ Быстрый",
         "invalid_num":    "⚠️ Пожалуйста, введите число. Например: 200",
         "operator_fwd":   "✅ Ваше сообщение передано оператору. Ожидайте ответа.",
     },
@@ -174,10 +178,14 @@ T = {
         "operator_msg":   "💬 *Mijozdan xabar*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Ariza bekor qilindi. Menyuga qaytamiz.",
         "btn_cancel":     "❌ Bekor qilish",
-        "btn_standard":   "🧺 Standart — 12 000",
-        "btn_deep":       "✨ Kimyoviy — 16 000",
-        "btn_ponka":      "🛋 Ponka — 16 000 dan",
-        "btn_dry":        "🌿 Quruq — 14 000",
+        "btn_svc_carpet":      "🧺 Gilam tozalash",
+        "btn_svc_carpet_home": "🏠 Gilamni uyda tozalash",
+        "btn_svc_sofa":        "🛋 Divan, kreslo tozalash",
+        "btn_svc_mattress":    "🛏 Matras, ko'rpa tozalash",
+        "btn_svc_curtains":    "🪟 Parda tozalash",
+        "ask_service_type":    "Xizmat turi:",
+        "btn_type_standard":   "🧺 Standart",
+        "btn_type_express":    "⚡ Tezkor",
         "invalid_num":    "⚠️ Iltimos, son kiriting. Masalan: 200",
         "operator_fwd":   "✅ Xabaringiz operatorga yuborildi. Javob kuting.",
     }
@@ -207,17 +215,18 @@ def t(uid, key): return T[lang(uid)].get(key, key)
 #  FSM STATES
 # ══════════════════════════════════════
 class OrderForm(StatesGroup):
-    name      = State()
-    phone     = State()
-    branch    = State()
-    city      = State()
-    address   = State()
-    location  = State()
-    service   = State()
-    date      = State()
-    time      = State()
-    time_from = State()   # ввод периода «с»
-    time_to   = State()   # ввод периода «до»
+    name        = State()
+    phone       = State()
+    branch      = State()
+    city        = State()
+    address     = State()
+    location    = State()
+    service     = State()
+    service_type = State()
+    date        = State()
+    time        = State()
+    time_from   = State()   # ввод периода «с»
+    time_to     = State()   # ввод периода «до»
 
 class CalcForm(StatesGroup):
     width   = State()
@@ -295,11 +304,19 @@ def city_kb(uid, branch):
 
 def service_kb(uid):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=t(uid,"btn_standard"), callback_data="svc_standard")],
-        [InlineKeyboardButton(text=t(uid,"btn_deep"),     callback_data="svc_deep")],
-        [InlineKeyboardButton(text=t(uid,"btn_ponka"),    callback_data="svc_ponka")],
-        [InlineKeyboardButton(text=t(uid,"btn_dry"),      callback_data="svc_dry")],
-        [InlineKeyboardButton(text=t(uid,"btn_cancel"),   callback_data="cancel_order")],
+        [InlineKeyboardButton(text=t(uid,"btn_svc_carpet"),      callback_data="svc_carpet")],
+        [InlineKeyboardButton(text=t(uid,"btn_svc_carpet_home"), callback_data="svc_carpet_home")],
+        [InlineKeyboardButton(text=t(uid,"btn_svc_sofa"),        callback_data="svc_sofa")],
+        [InlineKeyboardButton(text=t(uid,"btn_svc_mattress"),    callback_data="svc_mattress")],
+        [InlineKeyboardButton(text=t(uid,"btn_svc_curtains"),    callback_data="svc_curtains")],
+        [InlineKeyboardButton(text=t(uid,"btn_cancel"),          callback_data="cancel_order")],
+    ])
+
+def service_type_kb(uid):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(uid,"btn_type_standard"), callback_data="svctype_standard")],
+        [InlineKeyboardButton(text=t(uid,"btn_type_express"),  callback_data="svctype_express")],
+        [InlineKeyboardButton(text=t(uid,"btn_cancel"),        callback_data="cancel_order")],
     ])
 
 def date_kb(uid):
@@ -309,6 +326,7 @@ def date_kb(uid):
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=t(uid,"btn_today")    + f" ({today})",    callback_data=f"date_{today}")],
         [InlineKeyboardButton(text=t(uid,"btn_tomorrow") + f" ({tomorrow})", callback_data=f"date_{tomorrow}")],
+        [InlineKeyboardButton(text=t(uid,"btn_pick_date"), callback_data="date_pick")],
         [InlineKeyboardButton(text=t(uid,"btn_cancel"),    callback_data="cancel_order")],
     ])
 
@@ -632,20 +650,117 @@ async def order_location_skip(msg: Message, state: FSMContext):
 async def order_service(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     svc = cb.data.replace("svc_","")
-    svc_map = {"standard": t(uid,"btn_standard"), "deep": t(uid,"btn_deep"),
-               "ponka": t(uid,"btn_ponka"), "dry": t(uid,"btn_dry")}
+    svc_map = {
+        "carpet":       t(uid,"btn_svc_carpet"),
+        "carpet_home":  t(uid,"btn_svc_carpet_home"),
+        "sofa":         t(uid,"btn_svc_sofa"),
+        "mattress":     t(uid,"btn_svc_mattress"),
+        "curtains":     t(uid,"btn_svc_curtains"),
+    }
     user_data_db[uid]["service"] = svc_map.get(svc, svc)
+    await state.set_state(OrderForm.service_type)
+    await cb.message.answer(t(uid,"ask_service_type"), reply_markup=service_type_kb(uid))
+
+@dp.callback_query(F.data.startswith("svctype_"))
+async def order_service_type(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    svctype = cb.data.replace("svctype_","")
+    type_map = {
+        "standard": t(uid,"btn_type_standard"),
+        "express":  t(uid,"btn_type_express"),
+    }
+    user_data_db[uid]["service_type"] = type_map.get(svctype, svctype)
     await state.set_state(OrderForm.date)
     await cb.message.answer(t(uid,"ask_date"), reply_markup=date_kb(uid))
 
 # ── ДАТА — кнопки Сегодня/Завтра ──
-@dp.callback_query(F.data.startswith("date_"))
+@dp.callback_query(F.data.startswith("date_") & ~F.data.eq("date_pick"))
 async def order_date_btn(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     date_val = cb.data.replace("date_","")
     user_data_db[uid]["date"] = date_val
     await state.set_state(OrderForm.time)
     await cb.message.answer(t(uid,"ask_time"), reply_markup=time_kb(uid))
+
+# ── ДАТА — кнопка «Указать дату» (календарь) ──
+@dp.callback_query(F.data == "date_pick")
+async def order_date_pick(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    from datetime import date as dt_date
+    today = dt_date.today()
+    await cb.message.answer(
+        t(uid,"ask_date_manual"),
+        reply_markup=build_calendar(uid, today.year, today.month)
+    )
+
+def build_calendar(uid, year, month):
+    import calendar
+    from datetime import date as dt_date
+    cal = calendar.monthcalendar(year, month)
+    month_names_ru = ["","Январь","Февраль","Март","Апрель","Май","Июнь",
+                      "Июль","Август","Сентябрь","Октябрь","Ноябрь","Декабрь"]
+    month_names_uz = ["","Yanvar","Fevral","Mart","Aprel","May","Iyun",
+                      "Iyul","Avgust","Sentabr","Oktabr","Noyabr","Dekabr"]
+    month_name = month_names_uz[month] if user_lang.get(uid,"ru")=="uz" else month_names_ru[month]
+    rows = []
+    # Заголовок с навигацией
+    rows.append([
+        InlineKeyboardButton(text="◀️", callback_data=f"cal_prev_{year}_{month}"),
+        InlineKeyboardButton(text=f"{month_name} {year}", callback_data="ignore"),
+        InlineKeyboardButton(text="▶️", callback_data=f"cal_next_{year}_{month}"),
+    ])
+    # Дни недели
+    days_ru = ["Пн","Вт","Ср","Чт","Пт","Сб","Вс"]
+    days_uz = ["Du","Se","Ch","Pa","Ju","Sh","Ya"]
+    days = days_uz if user_lang.get(uid,"ru")=="uz" else days_ru
+    rows.append([InlineKeyboardButton(text=d, callback_data="ignore") for d in days])
+    # Числа
+    today = dt_date.today()
+    for week in cal:
+        row = []
+        for day in week:
+            if day == 0:
+                row.append(InlineKeyboardButton(text=" ", callback_data="ignore"))
+            else:
+                d = dt_date(year, month, day)
+                if d < today:
+                    row.append(InlineKeyboardButton(text=f"·{day}·", callback_data="ignore"))
+                else:
+                    date_str = d.strftime("%d.%m.%Y")
+                    row.append(InlineKeyboardButton(text=str(day), callback_data=f"calday_{date_str}"))
+        rows.append(row)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+@dp.callback_query(F.data.startswith("cal_prev_"))
+async def cal_prev(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    _, _, year, month = cb.data.split("_")
+    year, month = int(year), int(month)
+    month -= 1
+    if month < 1: month = 12; year -= 1
+    await cb.message.edit_reply_markup(reply_markup=build_calendar(uid, year, month))
+
+@dp.callback_query(F.data.startswith("cal_next_"))
+async def cal_next(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    _, _, year, month = cb.data.split("_")
+    year, month = int(year), int(month)
+    month += 1
+    if month > 12: month = 1; year += 1
+    await cb.message.edit_reply_markup(reply_markup=build_calendar(uid, year, month))
+
+@dp.callback_query(F.data.startswith("calday_"))
+async def cal_day(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    date_val = cb.data.replace("calday_","")
+    user_data_db[uid]["date"] = date_val
+    await cb.message.delete()
+    await state.set_state(OrderForm.time)
+    await cb.message.answer(t(uid,"ask_time"), reply_markup=time_kb(uid))
+
+@dp.callback_query(F.data == "ignore")
+async def ignore_cb(cb: CallbackQuery):
+    await cb.answer()
 
 
 @dp.callback_query(F.data.in_({"time_morning","time_evening","time_custom"}))
@@ -703,7 +818,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         "service":            d.get("service",""),
         "pickup_date":        d.get("date",""),
         "pickup_time":        time_txt,
-        "note":               "",
+        "note":               f"Тип услуги: {d.get('service_type','')}",
     })
 
     # Обновляем клиента в БД
@@ -732,6 +847,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         f"🏠 {md_escape(d.get('address',''))}\n"
         f"🗺 {md_escape(loc)}\n"
         f"🧺 {md_escape(d.get('service',''))}\n"
+        f"⚙️ {md_escape(d.get('service_type',''))}\n"
         f"📅 {md_escape(d.get('date',''))}\n"
         f"🕐 {md_escape(time_txt)}\n"
         f"━━━━━━━━━━━━━━━\n"
@@ -753,6 +869,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         "address":     d.get("address",""),
         "location":    d.get("location",""),
         "service":     d.get("service",""),
+        "service_type": d.get("service_type",""),
         "date":        d.get("date",""),
         "time":        time_txt,
         "note":        f"Telegram (бот) {order_num}",
