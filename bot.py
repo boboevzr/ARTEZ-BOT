@@ -90,6 +90,7 @@ T = {
         "ask_time_from":  "⏰ Введите время *С* (например: 10:00)",
         "ask_time_to":    "Введите время *ДО* (например: 14:00)",
         "order_done":     "✅ *Заявка принята!*\n\nМы перезвоним вам в течение 30 минут.\n\nНомер заявки: *#{num}*",
+        "order_rejected": "❌ К сожалению, заявка *{num}* не может быть выполнена.\n\nПозвоните нам:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Новая заявка #{num}* (бот)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *Прайс-лист ARTEZ*\n\n🧺 Стандартная чистка — 12 000 сум/м²\n✨ Глубокая химчистка — 16 000 сум/м²\n🛋 Бытовая техника/Понка — от 16 000 сум/шт\n🌿 Сухая чистка — 14 000 сум/м²\n\n📦 Минимальный заказ — 10 м²\n🚚 Вывоз и доставка — *бесплатно*",
         "calc_ask_w":     "🧮 *Калькулятор стоимости*\n\nВведите ширину ковра в сантиметрах:\n\nПример: 200 (= 2 метра)",
@@ -157,6 +158,7 @@ T = {
         "ask_time_from":  "⏰ *Dan* vaqtini kiriting (masalan: 10:00)",
         "ask_time_to":    "*Gacha* vaqtini kiriting (masalan: 14:00)",
         "order_done":     "✅ *Ariza qabul qilindi!*\n\n30 daqiqa ichida qayta qo'ng'iroq qilamiz.\n\nAriza raqami: *#{num}*",
+        "order_rejected": "❌ Afsuski, *{num}* arizasi bajarilishi mumkin emas.\n\nBizga qo'ng'iroq qiling:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Yangi ariza #{num}* (bot)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *ARTEZ narx-navo*\n\n🧺 Standart tozalash — 12 000 so'm/m²\n✨ Chuqur kimyoviy — 16 000 so'm/m²\n🛋 Maishiy texnika/Ponka — 16 000 so'mdan/dona\n🌿 Quruq tozalash — 14 000 so'm/m²\n\n📦 Minimal buyurtma — 10 m²\n🚚 Olib ketish va yetkazish — *bepul*",
         "calc_ask_w":     "🧮 *Narx kalkulyatori*\n\nGilam enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
@@ -981,7 +983,7 @@ async def group_reject(cb: CallbackQuery):
     ]))
     try:
         await bot.send_message(client_id,
-            f"❌ К сожалению, заявка *{order_num}* не может быть выполнена.\n📞 Позвоните: 1221",
+            t(client_id, "order_rejected").format(num=order_num),
             parse_mode="Markdown"
         )
     except Exception as e:
