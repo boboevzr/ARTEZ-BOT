@@ -357,23 +357,19 @@ async def notify_group(text: str, order_num: int = None, client_id: int = None, 
     """Отправляет заявку в группу сотрудников с кнопками действий"""
     kb = None
     if order_num and client_id:
-        clean_phone = (phone or "").strip()
-        call_button = InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}_{clean_phone}") if phone else \
-                      InlineKeyboardButton(text="📞 Позвонить", callback_data=f"call_{order_num}_{client_id}_")
         if username:
-            msg_button = InlineKeyboardButton(text="✉️ Написать клиенту", url=f"https://t.me/{username}")
+            msg_button = InlineKeyboardButton(text="✉️ Написать", url=f"https://t.me/{username}")
         else:
-            msg_button = InlineKeyboardButton(text="✉️ Написать клиенту", url=f"tg://user?id={client_id}")
+            msg_button = InlineKeyboardButton(text="✉️ Написать", url=f"tg://user?id={client_id}")
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [
                 InlineKeyboardButton(text="✅ Принять заказ",  callback_data=f"accept_{order_num}_{client_id}"),
-                call_button,
+                msg_button,
             ],
             [
                 InlineKeyboardButton(text="🚗 Назначить водителя", callback_data=f"driver_{order_num}_{client_id}"),
                 InlineKeyboardButton(text="❌ Отклонить",          callback_data=f"reject_{order_num}_{client_id}"),
             ],
-            [msg_button],
         ])
     try:
         await bot.send_message(GROUP_ID, text, reply_markup=kb)
@@ -793,8 +789,8 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
     loc = d.get("location","") or "—"
     summary = (
         f"📋 Новая заявка {order_num} (бот)\n"
-        f"━━━━━━━━━━━━━━━\n"
-        f"👤 {md_escape(d.get('name',''))} | TG: {md_escape(tg_name)}\n"
+        f"━━━━━━━━━━\n"
+        f"👤 {md_escape(d.get('name',''))}\n"
         f"🆔 {uid}\n"
         f"📞 {md_escape(d.get('phone',''))}\n"
         f"🏢 {md_escape(d.get('branch_name',''))}\n"
@@ -805,7 +801,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         f"⚙️ {md_escape(d.get('service_type',''))}\n"
         f"📅 {md_escape(d.get('date',''))}\n"
         f"🕐 {md_escape(time_txt)}\n"
-        f"━━━━━━━━━━━━━━━\n"
+        f"━━━━━━━━━━\n"
         f"🕒 {dt}"
     )
     raw_phone = (d.get("phone","") or "").strip()
@@ -925,16 +921,6 @@ async def group_accept(cb: CallbackQuery):
     except Exception as e:
         logging.warning(f"Client notify error: {e}")
     await cb.answer(f"Вы приняли заказ {order_num}")
-
-@dp.callback_query(F.data.startswith("call_"))
-async def group_call(cb: CallbackQuery):
-    parts = cb.data.split("_", 3)
-    num = parts[1]
-    phone = parts[3] if len(parts) > 3 else ""
-    if phone:
-        await cb.answer(f"📞 Заявка {num}\nНомер клиента: {phone}", show_alert=True)
-    else:
-        await cb.answer(f"Номер не указан (заявка {num})", show_alert=True)
 
 @dp.callback_query(F.data.startswith("driver_"))
 async def group_driver(cb: CallbackQuery):
