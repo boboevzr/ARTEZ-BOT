@@ -14,13 +14,14 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price, add_staff, remove_staff, get_staff_by_role
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang
 
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN   = os.getenv("BOT_TOKEN", "8871514482:AAGEqOUDPoAeCyyu8gvGa0ZkKRgqV28Yo5A")
 ADMIN_ID    = int(os.getenv("ADMIN_ID", "624826036"))       # ваш личный ID (для сообщений от оператора)
-GROUP_ID    = int(os.getenv("GROUP_ID", "-5211502458"))      # группа сотрудников
+GROUP_ID    = int(os.getenv("GROUP_ID", "-5211502458"))      # группа сотрудников (заявки)
+GROUP_SMS_ID = int(os.getenv("GROUP_SMS_ID", "-5303335722"))  # группа сообщений от клиентов
 SHEETS_URL  = os.getenv("SHEETS_URL", "https://script.google.com/macros/s/AKfycbyU5a3pMuTFme3dBNEgu46qzA1sN1Ekw-Q7p39F1Pg872lnnXZEFhJPjuc4TzZNHlpObQ/exec")
 
 bot = Bot(token=BOT_TOKEN)
@@ -58,6 +59,10 @@ T = {
         "btn_operator":   "👨‍💼 Оператор",
         "btn_info":       "ℹ️ О компании",
         "btn_help":       "🆘 Помощь",
+        "btn_settings":   "⚙️ Настройки",
+        "btn_change_lang": "🌐 Сменить язык",
+        "settings_text":  "⚙️ *Настройки*\n\nЗдесь вы можете изменить язык или открыть справку.",
+        "choose_lang_text": "🌐 Выберите язык:",
         "btn_back":       "◀️ Назад",
         "btn_menu":       "🏠 Меню",
         "btn_zarafshan":  "📍 Зарафшан",
@@ -93,9 +98,9 @@ T = {
         "order_rejected": "❌ К сожалению, заявка *{num}* не может быть выполнена.\n\nПозвоните нам:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Новая заявка #{num}* (бот)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *Прайс-лист ARTEZ*\n\n🧺 Стандартная чистка — 12 000 сум/м²\n✨ Глубокая химчистка — 16 000 сум/м²\n🛋 Бытовая техника/Понка — от 16 000 сум/шт\n🌿 Сухая чистка — 14 000 сум/м²\n\n📦 Минимальный заказ — 10 м²\n🚚 Вывоз и доставка — *бесплатно*",
-        "calc_ask_w":     "🧮 *Калькулятор стоимости*\n\nВведите ширину ковра в сантиметрах:\n\nПример: 200 (= 2 метра)",
+        "calc_ask_w":     "Введите ширину ковра в сантиметрах:\n\nПример: 200 (= 2 метра)",
         "calc_ask_l":     "Теперь введите длину ковра в сантиметрах:\n\nПример: 300 (= 3 метра)",
-        "calc_ask_svc":   "Выберите услугу:",
+        "calc_ask_svc":   "🧮 *Калькулятор стоимости*\n\nВыберите услугу:",
         "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ 10 м²)_",
         "branches_text":  "📍 *Наши филиалы*\n\n🏢 *Филиал Зарафшан*\nОбслуживает: Зарафшан, Учкудук, Тамдинский район\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Филиал Навои*\nОбслуживает: Навои и все остальные районы области\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка 10%\n🎉 Первый заказ — бесплатная доставка\n👨‍👩‍👧 Постоянным клиентам — накопительная скидка\n\nПодробности у оператора 👇",
@@ -130,6 +135,10 @@ T = {
         "btn_operator":   "👨‍💼 Operator",
         "btn_info":       "ℹ️ Kompaniya haqida",
         "btn_help":       "🆘 Yordam",
+        "btn_settings":   "⚙️ Sozlamalar",
+        "btn_change_lang": "🌐 Tilni o'zgartirish",
+        "settings_text":  "⚙️ *Sozlamalar*\n\nBu yerda tilni o'zgartirishingiz yoki yordam bo'limini ochishingiz mumkin.",
+        "choose_lang_text": "🌐 Tilni tanlang:",
         "btn_back":       "◀️ Orqaga",
         "btn_menu":       "🏠 Menyu",
         "btn_zarafshan":  "📍 Zarafshon",
@@ -165,9 +174,9 @@ T = {
         "order_rejected": "❌ Afsuski, *{num}* arizasi bajarilishi mumkin emas.\n\nBizga qo'ng'iroq qiling:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Yangi ariza #{num}* (bot)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *ARTEZ narx-navo*\n\n🧺 Standart tozalash — 12 000 so'm/m²\n✨ Chuqur kimyoviy — 16 000 so'm/m²\n🛋 Maishiy texnika/Ponka — 16 000 so'mdan/dona\n🌿 Quruq tozalash — 14 000 so'm/m²\n\n📦 Minimal buyurtma — 10 m²\n🚚 Olib ketish va yetkazish — *bepul*",
-        "calc_ask_w":     "🧮 *Narx kalkulyatori*\n\nGilam enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
+        "calc_ask_w":     "Gilam enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
         "calc_ask_l":     "Endi gilam bo'yini santimetrda kiriting:\n\nMisol: 300 (= 3 metr)",
-        "calc_ask_svc":   "Xizmatni tanlang:",
+        "calc_ask_svc":   "🧮 *Narx kalkulyatori*\n\nXizmatni tanlang:",
         "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma 10 m²)_",
         "branches_text":  "📍 *Filiallarimiz*\n\n🏢 *Zarafshon filiali*\nXizmat ko'rsatadi: Zarafshon, Uchquduq, Tomdi tumani\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Navoiy filiali*\nXizmat ko'rsatadi: Navoiy va viloyatning boshqa tumanlari\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam — 10% chegirma\n🎉 Birinchi buyurtma — bepul yetkazish\n👨‍👩‍👧 Doimiy mijozlar — jamg'arma chegirma\n\nBatafsil operator bilan 👇",
@@ -339,9 +348,16 @@ def menu_kb(uid):
          InlineKeyboardButton(text=t(uid,"btn_status"),   callback_data="menu_status")],
         [InlineKeyboardButton(text=t(uid,"btn_operator"), callback_data="menu_operator"),
          InlineKeyboardButton(text=t(uid,"btn_info"),     callback_data="menu_info")],
-        [InlineKeyboardButton(text=t(uid,"btn_help"),     callback_data="menu_help")],
+        [InlineKeyboardButton(text=t(uid,"btn_settings"),  callback_data="menu_settings")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def settings_kb(uid):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(uid,"btn_change_lang"), callback_data="settings_lang")],
+        [InlineKeyboardButton(text=t(uid,"btn_help"),        callback_data="menu_help")],
+        [InlineKeyboardButton(text=t(uid,"btn_menu"),        callback_data="go_menu")],
+    ])
 
 def back_kb(uid):
     return InlineKeyboardMarkup(inline_keyboard=[[
@@ -475,6 +491,17 @@ async def notify_admin(text: str):
 async def cmd_start(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
+
+    # Если язык ещё не известен в этой сессии — пробуем подгрузить из БД
+    if uid not in user_lang:
+        try:
+            saved_lang = await get_client_lang(uid)
+        except Exception as e:
+            logging.warning(f"get_client_lang error: {e}")
+            saved_lang = None
+        if saved_lang in ("ru", "uz"):
+            user_lang[uid] = saved_lang
+
     # Сохраняем/обновляем клиента в БД
     await upsert_client(
         tg_id=uid,
@@ -483,12 +510,20 @@ async def cmd_start(msg: Message, state: FSMContext):
         last_name=msg.from_user.last_name,
         lang=user_lang.get(uid,"ru")
     )
-    await msg.answer("👋", reply_markup=lang_kb())
+
+    if uid in user_lang:
+        await msg.answer(t(uid,"menu_title"), reply_markup=menu_kb(uid), parse_mode="Markdown")
+    else:
+        await msg.answer("👋", reply_markup=lang_kb())
 
 @dp.callback_query(F.data.in_({"lang_ru","lang_uz"}))
 async def set_language(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     user_lang[uid] = "ru" if cb.data == "lang_ru" else "uz"
+    try:
+        await set_client_lang(uid, user_lang[uid])
+    except Exception as e:
+        logging.warning(f"set_client_lang error: {e}")
     await cb.message.edit_text(t(uid,"lang_set"))
     await cb.message.answer(t(uid,"menu_title"), reply_markup=menu_kb(uid), parse_mode="Markdown")
 
@@ -497,8 +532,16 @@ async def go_menu(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     await state.clear()
     if uid not in user_lang:
-        await cb.message.answer("👋", reply_markup=lang_kb())
-        return
+        try:
+            saved_lang = await get_client_lang(uid)
+        except Exception as e:
+            logging.warning(f"get_client_lang error: {e}")
+            saved_lang = None
+        if saved_lang in ("ru", "uz"):
+            user_lang[uid] = saved_lang
+        else:
+            await cb.message.answer("👋", reply_markup=lang_kb())
+            return
     await cb.message.answer(t(uid,"menu_title"), reply_markup=menu_kb(uid), parse_mode="Markdown")
 
 # ── МЕНЮ ПУНКТЫ ──
@@ -526,6 +569,16 @@ async def menu_info(cb: CallbackQuery):
 async def menu_help(cb: CallbackQuery):
     uid = cb.from_user.id
     await cb.message.answer(t(uid,"help_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
+
+@dp.callback_query(F.data == "menu_settings")
+async def menu_settings(cb: CallbackQuery):
+    uid = cb.from_user.id
+    await cb.message.answer(t(uid,"settings_text"), reply_markup=settings_kb(uid), parse_mode="Markdown")
+
+@dp.callback_query(F.data == "settings_lang")
+async def settings_lang(cb: CallbackQuery):
+    uid = cb.from_user.id
+    await cb.message.answer(t(uid,"choose_lang_text"), reply_markup=lang_kb())
 
 @dp.callback_query(F.data == "menu_status")
 async def menu_status(cb: CallbackQuery):
@@ -568,11 +621,11 @@ async def operator_message(msg: Message, state: FSMContext):
             url=tg_link
         )],
     ])
-    # Отправляем в группу сотрудников
+    # Отправляем в группу сообщений от клиентов
     try:
-        await bot.send_message(GROUP_ID, text, parse_mode="Markdown", reply_markup=reply_kb)
+        await bot.send_message(GROUP_SMS_ID, text, parse_mode="Markdown", reply_markup=reply_kb)
     except Exception as e:
-        logging.warning(f"Group notify error (operator msg): {e}")
+        logging.warning(f"Group SMS notify error (operator msg): {e}")
         await bot.send_message(ADMIN_ID, text, parse_mode="Markdown", reply_markup=reply_kb)
     # Подтверждение клиенту
     await msg.answer(t(uid,"operator_fwd"), reply_markup=back_kb(uid))
@@ -926,6 +979,22 @@ async def cancel_order(cb: CallbackQuery, state: FSMContext):
 async def menu_calc(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     user_data_db[uid] = {}
+    await state.set_state(CalcForm.service)
+    await cb.message.answer(t(uid,"calc_ask_svc"), reply_markup=service_kb(uid), parse_mode="Markdown")
+
+@dp.callback_query(CalcForm.service, F.data.startswith("svc_"))
+async def calc_service(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    svc = cb.data.replace("svc_","")
+    user_data_db[uid]["calc_svc"] = svc
+    await state.set_state(CalcForm.service_type)
+    await cb.message.answer(t(uid,"ask_service_type"), reply_markup=service_type_kb(uid))
+
+@dp.callback_query(CalcForm.service_type, F.data.startswith("svctype_"))
+async def calc_service_type(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    svctype = cb.data.replace("svctype_","")
+    user_data_db[uid]["calc_svctype"] = svctype
     await state.set_state(CalcForm.width)
     await cb.message.answer(t(uid,"calc_ask_w"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
 
@@ -946,27 +1015,14 @@ async def calc_length(msg: Message, state: FSMContext):
     try:
         l = float(msg.text.replace(",","."))
         user_data_db[uid]["calc_l"] = l
-        await state.set_state(CalcForm.service)
-        await msg.answer(t(uid,"calc_ask_svc"), reply_markup=service_kb(uid))
     except:
         await msg.answer(t(uid,"invalid_num"))
+        return
 
-@dp.callback_query(CalcForm.service, F.data.startswith("svc_"))
-async def calc_service(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    svc = cb.data.replace("svc_","")
-    user_data_db[uid]["calc_svc"] = svc
-    await state.set_state(CalcForm.service_type)
-    await cb.message.answer(t(uid,"ask_service_type"), reply_markup=service_type_kb(uid))
-
-@dp.callback_query(CalcForm.service_type, F.data.startswith("svctype_"))
-async def calc_service_type(cb: CallbackQuery, state: FSMContext):
-    uid = cb.from_user.id
-    svctype = cb.data.replace("svctype_","")
     d   = user_data_db.get(uid,{})
-    svc = d.get("calc_svc","carpet")
-    w   = d.get("calc_w",200)
-    l   = d.get("calc_l",300)
+    svc     = d.get("calc_svc","carpet")
+    svctype = d.get("calc_svctype","standard")
+    w       = d.get("calc_w",200)
     sqm_real = (w/100) * (l/100)
     sqm_bill = max(sqm_real, 10)
     price    = get_cached_price(svc, svctype)
@@ -986,7 +1042,7 @@ async def calc_service_type(cb: CallbackQuery, state: FSMContext):
         svc=f"{svc_name} ({type_name})", price=f"{price:,}".replace(","," "),
         total=f"{total:,}".replace(","," ")
     )
-    await cb.message.answer(result, reply_markup=back_kb(uid), parse_mode="Markdown")
+    await msg.answer(result, reply_markup=back_kb(uid), parse_mode="Markdown")
     await state.clear()
 
 # ── КНОПКИ В ГРУППЕ ──
@@ -1168,8 +1224,8 @@ async def cmd_calc(msg: Message, state: FSMContext):
     if uid not in user_lang:
         await msg.answer("👋", reply_markup=lang_kb()); return
     user_data_db[uid] = {}
-    await state.set_state(CalcForm.width)
-    await msg.answer(t(uid,"calc_ask_w"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
+    await state.set_state(CalcForm.service)
+    await msg.answer(t(uid,"calc_ask_svc"), reply_markup=service_kb(uid), parse_mode="Markdown")
 
 @dp.message(Command("prices"))
 async def cmd_prices(msg: Message):

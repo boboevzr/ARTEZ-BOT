@@ -448,3 +448,22 @@ async def get_staff_by_role(role: str):
             "SELECT * FROM staff WHERE role=$1 AND is_active=TRUE ORDER BY first_name",
             role
         )
+
+
+async def get_client_lang(tg_id: int):
+    """Возвращает сохранённый язык клиента ('ru'/'uz') или None, если клиент не найден."""
+    if not pool:
+        return None
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT lang FROM clients WHERE tg_id=$1", tg_id)
+    return row["lang"] if row else None
+
+
+async def set_client_lang(tg_id: int, lang: str):
+    if not pool:
+        return
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE clients SET lang=$1, updated_at=NOW() WHERE tg_id=$2",
+            lang, tg_id
+        )
