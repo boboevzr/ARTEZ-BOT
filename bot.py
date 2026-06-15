@@ -785,7 +785,7 @@ async def order_location_skip(msg: Message, state: FSMContext):
     await msg.answer("⏭", reply_markup=ReplyKeyboardRemove())
     await msg.answer(t(uid,"ask_service"), reply_markup=service_kb(uid))
 
-@dp.callback_query(F.data.startswith("svc_"))
+@dp.callback_query(OrderForm.service, F.data.startswith("svc_"))
 async def order_service(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     svc = cb.data.replace("svc_","")
@@ -800,7 +800,7 @@ async def order_service(cb: CallbackQuery, state: FSMContext):
     await state.set_state(OrderForm.service_type)
     await cb.message.answer(t(uid,"ask_service_type"), reply_markup=service_type_kb(uid))
 
-@dp.callback_query(F.data.startswith("svctype_"))
+@dp.callback_query(OrderForm.service_type, F.data.startswith("svctype_"))
 async def order_service_type(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     svctype = cb.data.replace("svctype_","")
