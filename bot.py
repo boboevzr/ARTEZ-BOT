@@ -109,6 +109,14 @@ T = {
         "info_text":      "ℹ️ *О компании ARTEZ*\n\nООО «ARTEZ» — профессиональная чистка ковров в Навоийской области.\n\n🏢 Два филиала: Зарафшан и Навои\n🚚 Бесплатный вывоз и доставка\n⚡ Срок чистки от 24 часов\n🛡 Бережное отношение к коврам\n\n🌐 artez.uz\n📢 Telegram-группа: @artez_gilam_yuvish\n\n☎️ Короткий номер: 1221\n📞 Оператор: +998 79 222 12 21\n\n*г. Зарафшан*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*г. Навои*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Помощь*\n\n/start — Главное меню\n/order — Оставить заявку\n/calc — Калькулятор\n/prices — Цены\n/branches — Филиалы\n\nПо всем вопросам: 📞 1221",
         "status_text":    "📦 *Статус заказа*\n\nДля проверки статуса заказа позвоните нам:\n📞 1221\n📱 +998 79 222-12-21\n\nИли напишите оператору 👇",
+        "status_menu_title": "📦 *Статус заказа*\n\nВыберите категорию:",
+        "status_btn_new":       "🆕 Новые",
+        "status_btn_progress":  "🔄 В работе",
+        "status_btn_done":      "✅ Выполнено",
+        "status_btn_cancelled": "❌ Отказано",
+        "status_empty":   "📦 *Статус заказа*\n\nУ вас пока нет заявок.\n\nОформить заявку: /order",
+        "status_group_empty": "В этой категории заявок нет.",
+        "status_order_line":  "📋 *{num}*\n🧺 {service}\n📅 {date}\n📍 Статус: {status}",
         "operator_text":  "👨‍💼 Соединяю с оператором...\n\nНапишите ваш вопрос — оператор ответит в ближайшее время.",
         "operator_msg":   "💬 *Сообщение клиенту*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Заявка отменена. Возвращаемся в меню.",
@@ -187,6 +195,14 @@ T = {
         "info_text":      "ℹ️ *ARTEZ haqida*\n\nARTEZ MChJ — Navoiy viloyatida professional gilam tozalash.\n\n🏢 Ikki filial: Zarafshon va Navoiy\n🚚 Bepul olib ketish va yetkazish\n⚡ Tozalash muddati 24 soatdan\n🛡 Gilamlarga ehtiyotkorona munosabat\n\n🌐 artez.uz\n📢 Telegram-guruh: @artez_gilam_yuvish\n\n☎️ Qisqa raqam: 1221\n📞 Operator: +998 79 222 12 21\n\n*Zarafshon shahri*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*Navoiy shahri*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Yordam*\n\n/start — Asosiy menyu\n/order — Ariza qoldirish\n/calc — Kalkulyator\n/prices — Narxlar\n/branches — Filiallar\n\nBarcha savollar uchun: 📞 1221",
         "status_text":    "📦 *Buyurtma holati*\n\nBuyurtma holatini tekshirish uchun qo'ng'iroq qiling:\n📞 1221\n📱 +998 79 222-12-21\n\nYoki operatorga yozing 👇",
+        "status_menu_title": "📦 *Buyurtma holati*\n\nKategoriyani tanlang:",
+        "status_btn_new":       "🆕 Yangi",
+        "status_btn_progress":  "🔄 Bajarilmoqda",
+        "status_btn_done":      "✅ Bajarildi",
+        "status_btn_cancelled": "❌ Bekor qilindi",
+        "status_empty":   "📦 *Buyurtma holati*\n\nSizda hali buyurtmalar yo'q.\n\nBuyurtma berish: /order",
+        "status_group_empty": "Bu kategoriyada buyurtmalar yo'q.",
+        "status_order_line":  "📋 *{num}*\n🧺 {service}\n📅 {date}\n📍 Holat: {status}",
         "operator_text":  "👨‍💼 Operator bilan bog'lanmoqda...\n\nSavolingizni yozing — operator tez orada javob beradi.",
         "operator_msg":   "💬 *Mijozdan xabar*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Ariza bekor qilindi. Menyuga qaytamiz.",
@@ -262,6 +278,32 @@ def svc_display_name(uid, svc, svctype):
 
 # Услуги, для которых действует минимальный заказ 10 м²
 MIN_ORDER_SERVICES = {"carpet", "carpet_home"}
+
+# Группы статусов заказа для раздела «Статус заказа»
+STATUS_GROUPS = {
+    "new":       ["new", "confirmed"],
+    "progress":  ["pickup", "received", "washing", "packing", "ready", "delivery"],
+    "done":      ["delivered"],
+    "cancelled": ["cancelled"],
+}
+
+ORDER_STATUS_NAMES_RU = {
+    "new": "🆕 Новый", "confirmed": "✅ Подтверждён",
+    "pickup": "🚗 Вывоз", "received": "📥 Принят в мастерскую", "washing": "🧼 В чистке",
+    "packing": "📦 Упаковка", "ready": "✅ Готов", "delivery": "🚚 Доставка",
+    "delivered": "✅ Доставлен", "cancelled": "❌ Отменён",
+}
+ORDER_STATUS_NAMES_UZ = {
+    "new": "🆕 Yangi", "confirmed": "✅ Tasdiqlangan",
+    "pickup": "🚗 Olib ketish", "received": "📥 Ustaxonaga qabul qilindi", "washing": "🧼 Tozalanmoqda",
+    "packing": "📦 Qadoqlash", "ready": "✅ Tayyor", "delivery": "🚚 Yetkazish",
+    "delivered": "✅ Yetkazildi", "cancelled": "❌ Bekor qilindi",
+}
+
+def order_status_name(uid, status):
+    names = ORDER_STATUS_NAMES_UZ if lang(uid) == "uz" else ORDER_STATUS_NAMES_RU
+    return names.get(status, status)
+
 
 # Человекочитаемые названия услуг/типов для команд админа
 SERVICE_KEYS = ["carpet", "carpet_home", "sofa", "mattress", "curtains"]
@@ -601,10 +643,74 @@ async def settings_lang(cb: CallbackQuery):
     uid = cb.from_user.id
     await cb.message.answer(t(uid,"choose_lang_text"), reply_markup=lang_kb())
 
+def status_menu_kb(uid, counts):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=f"{t(uid,'status_btn_new')} ({counts['new']})",       callback_data="status_new"),
+         InlineKeyboardButton(text=f"{t(uid,'status_btn_progress')} ({counts['progress']})", callback_data="status_progress")],
+        [InlineKeyboardButton(text=f"{t(uid,'status_btn_done')} ({counts['done']})",     callback_data="status_done"),
+         InlineKeyboardButton(text=f"{t(uid,'status_btn_cancelled')} ({counts['cancelled']})", callback_data="status_cancelled")],
+        [InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")],
+    ])
+
 @dp.callback_query(F.data == "menu_status")
 async def menu_status(cb: CallbackQuery):
     uid = cb.from_user.id
-    await cb.message.answer(t(uid,"status_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
+    try:
+        orders = await get_client_orders(uid)
+    except Exception as e:
+        logging.warning(f"get_client_orders error: {e}")
+        orders = []
+
+    counts = {"new": 0, "progress": 0, "done": 0, "cancelled": 0}
+    for o in orders:
+        for group, statuses in STATUS_GROUPS.items():
+            if o["status"] in statuses:
+                counts[group] += 1
+                break
+
+    if not orders:
+        await cb.message.answer(t(uid,"status_empty"), reply_markup=back_kb(uid), parse_mode="Markdown")
+        return
+
+    await cb.message.answer(t(uid,"status_menu_title"), reply_markup=status_menu_kb(uid, counts), parse_mode="Markdown")
+
+@dp.callback_query(F.data.in_({"status_new","status_progress","status_done","status_cancelled"}))
+async def show_status_group(cb: CallbackQuery):
+    uid   = cb.from_user.id
+    group = cb.data.replace("status_","")
+    statuses = STATUS_GROUPS.get(group, [])
+
+    try:
+        orders = await get_client_orders(uid)
+    except Exception as e:
+        logging.warning(f"get_client_orders error: {e}")
+        orders = []
+
+    filtered = [o for o in orders if o["status"] in statuses]
+
+    group_titles = {
+        "new": "status_btn_new", "progress": "status_btn_progress",
+        "done": "status_btn_done", "cancelled": "status_btn_cancelled",
+    }
+    title = t(uid, group_titles.get(group, "status_btn_new"))
+
+    if not filtered:
+        text = f"{title}\n\n" + t(uid,"status_group_empty")
+    else:
+        lines = [f"{title}\n"]
+        for o in filtered:
+            lines.append(
+                t(uid,"status_order_line").format(
+                    num=o["order_num"],
+                    service=o["service"] or "",
+                    date=o["pickup_date"] or "",
+                    status=order_status_name(uid, o["status"]),
+                )
+            )
+        text = "\n\n".join(lines)
+
+    await cb.message.answer(text, reply_markup=back_kb(uid), parse_mode="Markdown")
+
 
 # ── ОПЕРАТОР ──
 @dp.callback_query(F.data == "menu_operator")
