@@ -49,7 +49,7 @@ T = {
     "ru": {
         "choose_lang":    "👋 Добро пожаловать в ARTEZ!\n\nВыберите язык:",
         "lang_set":       "🇷🇺 Выбран русский язык",
-        "menu_title":     "🏠 Главное меню\n\nООО «ARTEZ» — профессиональная чистка ковров\n📍 Зарафшан и Навои",
+        "menu_title":     "🏠 Главное меню\n\nООО «ARTEZ» — профессиональная чистка ковров\n📍 Зарафшан и Навои\n\n☎️ Короткий номер: `1221`\n📞 Оператор: `+998 79 222 12 21`\n\n*г. Зарафшан*\n📱 `+998 88 200 12 21`\n📱 `+998 94 738 04 44`\n\n*г. Навои*\n📱 `+998 99 750 00 20`\n📱 `+998 99 112 48 48`",
         "btn_order":      "📋 Оставить заявку",
         "btn_calc":       "🧮 Калькулятор",
         "btn_prices":     "💰 Цены",
@@ -105,7 +105,7 @@ T = {
         "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ 10 м²)_",
         "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*",
         "branches_text":  "📍 *Наши филиалы*\n\n🏢 *Филиал Зарафшан*\nОбслуживает: Зарафшан, Учкудук, Тамдинский район\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Филиал Навои*\nОбслуживает: Навои и все остальные районы области\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
-        "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка 10%\n🎉 Первый заказ — бесплатная доставка\n👨‍👩‍👧 Постоянным клиентам — накопительная скидка\n\nПодробности у оператора 👇",
+        "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка до 20%\n🚚 На все заказы — бесплатная доставка и забор\n🚗 Если у вас свой автомобиль — скидка до 20% на страховой полис ОСАГО\n📢 Подписчикам нашей Telegram-группы и Instagram — скидка до 30%\n\nПодробности у оператора 👇",
         "info_text":      "ℹ️ *О компании ARTEZ*\n\nООО «ARTEZ» — профессиональная чистка ковров в Навоийской области.\n\n🏢 Два филиала: Зарафшан и Навои\n🚚 Бесплатный вывоз и доставка\n⚡ Срок чистки от 24 часов\n🛡 Бережное отношение к коврам\n\n🌐 artez.uz\n📢 Telegram-группа: @artez_gilam_yuvish\n\n☎️ Короткий номер: 1221\n📞 Оператор: +998 79 222 12 21\n\n*г. Зарафшан*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*г. Навои*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Помощь*\n\n/start — Главное меню\n/order — Оставить заявку\n/calc — Калькулятор\n/prices — Цены\n/branches — Филиалы\n\nПо всем вопросам: 📞 1221",
         "status_text":    "📦 *Статус заказа*\n\nДля проверки статуса заказа позвоните нам:\n📞 1221\n📱 +998 79 222-12-21\n\nИли напишите оператору 👇",
@@ -117,6 +117,7 @@ T = {
         "status_empty":   "📦 *Статус заказа*\n\nУ вас пока нет заявок.\n\nОформить заявку: /order",
         "status_group_empty": "В этой категории заявок нет.",
         "status_order_line":  "📋 *{num}*\n🧺 {service}\n📅 {date}\n📍 Статус: {status}",
+        "btn_back_to_status": "◀️ К категориям",
         "operator_text":  "👨‍💼 Соединяю с оператором...\n\nНапишите ваш вопрос — оператор ответит в ближайшее время.",
         "operator_msg":   "💬 *Сообщение клиенту*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Заявка отменена. Возвращаемся в меню.",
@@ -135,7 +136,7 @@ T = {
     "uz": {
         "choose_lang":    "👋 ARTEZ ga xush kelibsiz!\n\nTilni tanlang:",
         "lang_set":       "🇺🇿 O'zbek tili tanlandi",
-        "menu_title":     "🏠 Asosiy menyu\n\nARTEZ MChJ — professional gilam tozalash\n📍 Zarafshon va Navoiy",
+        "menu_title":     "🏠 Asosiy menyu\n\nARTEZ MChJ — professional gilam tozalash\n📍 Zarafshon va Navoiy\n\n☎️ Qisqa raqam: `1221`\n📞 Operator: `+998 79 222 12 21`\n\n*Zarafshon shahri*\n📱 `+998 88 200 12 21`\n📱 `+998 94 738 04 44`\n\n*Navoiy shahri*\n📱 `+998 99 750 00 20`\n📱 `+998 99 112 48 48`",
         "btn_order":      "📋 Ariza qoldirish",
         "btn_calc":       "🧮 Kalkulyator",
         "btn_prices":     "💰 Narxlar",
@@ -191,7 +192,7 @@ T = {
         "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma 10 m²)_",
         "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*",
         "branches_text":  "📍 *Filiallarimiz*\n\n🏢 *Zarafshon filiali*\nXizmat ko'rsatadi: Zarafshon, Uchquduq, Tomdi tumani\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Navoiy filiali*\nXizmat ko'rsatadi: Navoiy va viloyatning boshqa tumanlari\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
-        "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam — 10% chegirma\n🎉 Birinchi buyurtma — bepul yetkazish\n👨‍👩‍👧 Doimiy mijozlar — jamg'arma chegirma\n\nBatafsil operator bilan 👇",
+        "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam buyurtma qilsangiz — 20% gacha chegirma\n🚚 Barcha buyurtmalar uchun — bepul olib ketish va yetkazish\n🚗 Agar shaxsiy avtomobilingiz bo'lsa — OSAGO sug'urta polisiga 20% gacha chegirma\n📢 Telegram-guruhimiz va Instagram'ga obuna bo'lganlar uchun — 30% gacha chegirma\n\nBatafsil operator bilan 👇",
         "info_text":      "ℹ️ *ARTEZ haqida*\n\nARTEZ MChJ — Navoiy viloyatida professional gilam tozalash.\n\n🏢 Ikki filial: Zarafshon va Navoiy\n🚚 Bepul olib ketish va yetkazish\n⚡ Tozalash muddati 24 soatdan\n🛡 Gilamlarga ehtiyotkorona munosabat\n\n🌐 artez.uz\n📢 Telegram-guruh: @artez_gilam_yuvish\n\n☎️ Qisqa raqam: 1221\n📞 Operator: +998 79 222 12 21\n\n*Zarafshon shahri*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*Navoiy shahri*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Yordam*\n\n/start — Asosiy menyu\n/order — Ariza qoldirish\n/calc — Kalkulyator\n/prices — Narxlar\n/branches — Filiallar\n\nBarcha savollar uchun: 📞 1221",
         "status_text":    "📦 *Buyurtma holati*\n\nBuyurtma holatini tekshirish uchun qo'ng'iroq qiling:\n📞 1221\n📱 +998 79 222-12-21\n\nYoki operatorga yozing 👇",
@@ -203,6 +204,7 @@ T = {
         "status_empty":   "📦 *Buyurtma holati*\n\nSizda hali buyurtmalar yo'q.\n\nBuyurtma berish: /order",
         "status_group_empty": "Bu kategoriyada buyurtmalar yo'q.",
         "status_order_line":  "📋 *{num}*\n🧺 {service}\n📅 {date}\n📍 Holat: {status}",
+        "btn_back_to_status": "◀️ Kategoriyalarga",
         "operator_text":  "👨‍💼 Operator bilan bog'lanmoqda...\n\nSavolingizni yozing — operator tez orada javob beradi.",
         "operator_msg":   "💬 *Mijozdan xabar*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Ariza bekor qilindi. Menyuga qaytamiz.",
@@ -406,12 +408,11 @@ def menu_kb(uid):
         [InlineKeyboardButton(text=t(uid,"btn_order"),    callback_data="menu_order"),
          InlineKeyboardButton(text=t(uid,"btn_calc"),     callback_data="menu_calc")],
         [InlineKeyboardButton(text=t(uid,"btn_prices"),   callback_data="menu_prices"),
-         InlineKeyboardButton(text=t(uid,"btn_branches"), callback_data="menu_branches")],
+         InlineKeyboardButton(text=t(uid,"btn_settings"), callback_data="menu_settings")],
         [InlineKeyboardButton(text=t(uid,"btn_promo"),    callback_data="menu_promo"),
          InlineKeyboardButton(text=t(uid,"btn_status"),   callback_data="menu_status")],
         [InlineKeyboardButton(text=t(uid,"btn_operator"), callback_data="menu_operator"),
          InlineKeyboardButton(text=t(uid,"btn_info"),     callback_data="menu_info")],
-        [InlineKeyboardButton(text=t(uid,"btn_settings"),  callback_data="menu_settings")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -674,6 +675,12 @@ async def menu_status(cb: CallbackQuery):
 
     await cb.message.answer(t(uid,"status_menu_title"), reply_markup=status_menu_kb(uid, counts), parse_mode="Markdown")
 
+def back_to_status_kb(uid):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(uid,"btn_back_to_status"), callback_data="menu_status")],
+        [InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")],
+    ])
+
 @dp.callback_query(F.data.in_({"status_new","status_progress","status_done","status_cancelled"}))
 async def show_status_group(cb: CallbackQuery):
     uid   = cb.from_user.id
@@ -709,7 +716,7 @@ async def show_status_group(cb: CallbackQuery):
             )
         text = "\n\n".join(lines)
 
-    await cb.message.answer(text, reply_markup=back_kb(uid), parse_mode="Markdown")
+    await cb.message.answer(text, reply_markup=back_to_status_kb(uid), parse_mode="Markdown")
 
 
 # ── ОПЕРАТОР ──
