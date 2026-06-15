@@ -99,8 +99,8 @@ T = {
         "order_summary":  "📋 *Новая заявка #{num}* (бот)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *Прайс-лист ARTEZ*\n\n🧺 Стандартная чистка — 12 000 сум/м²\n✨ Глубокая химчистка — 16 000 сум/м²\n🛋 Бытовая техника/Понка — от 16 000 сум/шт\n🌿 Сухая чистка — 14 000 сум/м²\n\n📦 Минимальный заказ — 10 м²\n🚚 Вывоз и доставка — *бесплатно*",
         "calc_selected_header": "🧮 *Калькулятор стоимости*\n\n🧺 Услуга: {svc}",
-        "calc_ask_w":     "Введите ширину ковра в сантиметрах:\n\nПример: 200 (= 2 метра)",
-        "calc_ask_l":     "Теперь введите длину ковра в сантиметрах:\n\nПример: 300 (= 3 метра)",
+        "calc_ask_w":     "Введите ширину в сантиметрах:\n\nПример: 200 (= 2 метра)",
+        "calc_ask_l":     "Теперь введите длину в сантиметрах:\n\nПример: 300 (= 3 метра)",
         "calc_ask_svc":   "🧮 *Калькулятор стоимости*\n\nВыберите услугу:",
         "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ 10 м²)_",
         "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*",
@@ -177,8 +177,8 @@ T = {
         "order_summary":  "📋 *Yangi ariza #{num}* (bot)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *ARTEZ narx-navo*\n\n🧺 Standart tozalash — 12 000 so'm/m²\n✨ Chuqur kimyoviy — 16 000 so'm/m²\n🛋 Maishiy texnika/Ponka — 16 000 so'mdan/dona\n🌿 Quruq tozalash — 14 000 so'm/m²\n\n📦 Minimal buyurtma — 10 m²\n🚚 Olib ketish va yetkazish — *bepul*",
         "calc_selected_header": "🧮 *Narx kalkulyatori*\n\n🧺 Xizmat: {svc}",
-        "calc_ask_w":     "Gilam enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
-        "calc_ask_l":     "Endi gilam bo'yini santimetrda kiriting:\n\nMisol: 300 (= 3 metr)",
+        "calc_ask_w":     "Enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
+        "calc_ask_l":     "Endi bo'yini santimetrda kiriting:\n\nMisol: 300 (= 3 metr)",
         "calc_ask_svc":   "🧮 *Narx kalkulyatori*\n\nXizmatni tanlang:",
         "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma 10 m²)_",
         "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*",
@@ -1002,6 +1002,7 @@ async def menu_calc(cb: CallbackQuery, state: FSMContext):
     user_data_db[uid] = {}
     await state.set_state(CalcForm.service)
     await cb.message.answer(t(uid,"calc_ask_svc"), reply_markup=service_kb(uid), parse_mode="Markdown")
+    await cb.answer()
 
 @dp.callback_query(CalcForm.service, F.data.startswith("svc_"))
 async def calc_service(cb: CallbackQuery, state: FSMContext):
@@ -1028,7 +1029,11 @@ async def calc_width(msg: Message, state: FSMContext):
         w = float(msg.text.replace(",","."))
         user_data_db[uid]["calc_w"] = w
         await state.set_state(CalcForm.length)
-        await msg.answer(t(uid,"calc_ask_l"), reply_markup=cancel_kb(uid))
+        d       = user_data_db.get(uid,{})
+        svc     = d.get("calc_svc","carpet")
+        svctype = d.get("calc_svctype","standard")
+        header  = t(uid,"calc_selected_header").format(svc=svc_display_name(uid, svc, svctype))
+        await msg.answer(header + "\n\n" + t(uid,"calc_ask_l"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
     except:
         await msg.answer(t(uid,"invalid_num"))
 
