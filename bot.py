@@ -98,13 +98,15 @@ T = {
         "order_rejected": "❌ К сожалению, заявка *{num}* не может быть выполнена.\n\nПозвоните нам:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Новая заявка #{num}* (бот)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *Прайс-лист ARTEZ*\n\n🧺 Стандартная чистка — 12 000 сум/м²\n✨ Глубокая химчистка — 16 000 сум/м²\n🛋 Бытовая техника/Понка — от 16 000 сум/шт\n🌿 Сухая чистка — 14 000 сум/м²\n\n📦 Минимальный заказ — 10 м²\n🚚 Вывоз и доставка — *бесплатно*",
+        "calc_selected_header": "🧮 *Калькулятор стоимости*\n\n🧺 Услуга: {svc}",
         "calc_ask_w":     "Введите ширину ковра в сантиметрах:\n\nПример: 200 (= 2 метра)",
         "calc_ask_l":     "Теперь введите длину ковра в сантиметрах:\n\nПример: 300 (= 3 метра)",
         "calc_ask_svc":   "🧮 *Калькулятор стоимости*\n\nВыберите услугу:",
         "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ 10 м²)_",
+        "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*",
         "branches_text":  "📍 *Наши филиалы*\n\n🏢 *Филиал Зарафшан*\nОбслуживает: Зарафшан, Учкудук, Тамдинский район\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Филиал Навои*\nОбслуживает: Навои и все остальные районы области\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка 10%\n🎉 Первый заказ — бесплатная доставка\n👨‍👩‍👧 Постоянным клиентам — накопительная скидка\n\nПодробности у оператора 👇",
-        "info_text":      "ℹ️ *О компании ARTEZ*\n\nООО «ARTEZ» — профессиональная чистка ковров в Навоийской области.\n\n🏢 Два филиала: Зарафшан и Навои\n🚚 Бесплатный вывоз и доставка\n⚡ Срок чистки от 24 часов\n🛡 Бережное отношение к коврам\n\n🌐 artez.uz",
+        "info_text":      "ℹ️ *О компании ARTEZ*\n\nООО «ARTEZ» — профессиональная чистка ковров в Навоийской области.\n\n🏢 Два филиала: Зарафшан и Навои\n🚚 Бесплатный вывоз и доставка\n⚡ Срок чистки от 24 часов\n🛡 Бережное отношение к коврам\n\n🌐 artez.uz\n📢 Telegram-группа: @artez_gilam_yuvish\n\n☎️ Короткий номер: 1221\n📞 Оператор: +998 79 222 12 21\n\n*г. Зарафшан*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*г. Навои*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Помощь*\n\n/start — Главное меню\n/order — Оставить заявку\n/calc — Калькулятор\n/prices — Цены\n/branches — Филиалы\n\nПо всем вопросам: 📞 1221",
         "status_text":    "📦 *Статус заказа*\n\nДля проверки статуса заказа позвоните нам:\n📞 1221\n📱 +998 79 222-12-21\n\nИли напишите оператору 👇",
         "operator_text":  "👨‍💼 Соединяю с оператором...\n\nНапишите ваш вопрос — оператор ответит в ближайшее время.",
@@ -174,13 +176,15 @@ T = {
         "order_rejected": "❌ Afsuski, *{num}* arizasi bajarilishi mumkin emas.\n\nBizga qo'ng'iroq qiling:\n📞 +998 94 738-04-44\n📞 +998 88 200-12-21",
         "order_summary":  "📋 *Yangi ariza #{num}* (bot)\n━━━━━━━━━━━━━━━\n👤 {name}\n📞 {phone}\n🏢 {branch}\n📍 {city}\n🏠 {address}\n🗺 {location}\n🧺 {service}\n📅 {date}\n🕐 {time}\n━━━━━━━━━━━━━━━\n🕒 {dt}",
         "prices_text":    "💰 *ARTEZ narx-navo*\n\n🧺 Standart tozalash — 12 000 so'm/m²\n✨ Chuqur kimyoviy — 16 000 so'm/m²\n🛋 Maishiy texnika/Ponka — 16 000 so'mdan/dona\n🌿 Quruq tozalash — 14 000 so'm/m²\n\n📦 Minimal buyurtma — 10 m²\n🚚 Olib ketish va yetkazish — *bepul*",
+        "calc_selected_header": "🧮 *Narx kalkulyatori*\n\n🧺 Xizmat: {svc}",
         "calc_ask_w":     "Gilam enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
         "calc_ask_l":     "Endi gilam bo'yini santimetrda kiriting:\n\nMisol: 300 (= 3 metr)",
         "calc_ask_svc":   "🧮 *Narx kalkulyatori*\n\nXizmatni tanlang:",
         "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma 10 m²)_",
+        "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*",
         "branches_text":  "📍 *Filiallarimiz*\n\n🏢 *Zarafshon filiali*\nXizmat ko'rsatadi: Zarafshon, Uchquduq, Tomdi tumani\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Navoiy filiali*\nXizmat ko'rsatadi: Navoiy va viloyatning boshqa tumanlari\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam — 10% chegirma\n🎉 Birinchi buyurtma — bepul yetkazish\n👨‍👩‍👧 Doimiy mijozlar — jamg'arma chegirma\n\nBatafsil operator bilan 👇",
-        "info_text":      "ℹ️ *ARTEZ haqida*\n\nARTEZ MChJ — Navoiy viloyatida professional gilam tozalash.\n\n🏢 Ikki filial: Zarafshon va Navoiy\n🚚 Bepul olib ketish va yetkazish\n⚡ Tozalash muddati 24 soatdan\n🛡 Gilamlarga ehtiyotkorona munosabat\n\n🌐 artez.uz",
+        "info_text":      "ℹ️ *ARTEZ haqida*\n\nARTEZ MChJ — Navoiy viloyatida professional gilam tozalash.\n\n🏢 Ikki filial: Zarafshon va Navoiy\n🚚 Bepul olib ketish va yetkazish\n⚡ Tozalash muddati 24 soatdan\n🛡 Gilamlarga ehtiyotkorona munosabat\n\n🌐 artez.uz\n📢 Telegram-guruh: @artez_gilam_yuvish\n\n☎️ Qisqa raqam: 1221\n📞 Operator: +998 79 222 12 21\n\n*Zarafshon shahri*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*Navoiy shahri*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Yordam*\n\n/start — Asosiy menyu\n/order — Ariza qoldirish\n/calc — Kalkulyator\n/prices — Narxlar\n/branches — Filiallar\n\nBarcha savollar uchun: 📞 1221",
         "status_text":    "📦 *Buyurtma holati*\n\nBuyurtma holatini tekshirish uchun qo'ng'iroq qiling:\n📞 1221\n📱 +998 79 222-12-21\n\nYoki operatorga yozing 👇",
         "operator_text":  "👨‍💼 Operator bilan bog'lanmoqda...\n\nSavolingizni yozing — operator tez orada javob beradi.",
@@ -241,6 +245,23 @@ def get_cached_price(service_key: str, type_key: str):
         return entry["price"]
     fallback = DEFAULT_PRICES.get(service_key, {}).get(type_key)
     return fallback["price"] if fallback else 12000
+
+SVC_KEY_MAP  = {
+    "carpet":      "btn_svc_carpet",
+    "carpet_home": "btn_svc_carpet_home",
+    "sofa":        "btn_svc_sofa",
+    "mattress":    "btn_svc_mattress",
+    "curtains":    "btn_svc_curtains",
+}
+TYPE_KEY_MAP = {"standard": "btn_type_standard", "express": "btn_type_express"}
+
+def svc_display_name(uid, svc, svctype):
+    svc_name  = t(uid, SVC_KEY_MAP.get(svc, "btn_svc_carpet"))
+    type_name = t(uid, TYPE_KEY_MAP.get(svctype, "btn_type_standard"))
+    return f"{svc_name} ({type_name})"
+
+# Услуги, для которых действует минимальный заказ 10 м²
+MIN_ORDER_SERVICES = {"carpet", "carpet_home"}
 
 # Человекочитаемые названия услуг/типов для команд админа
 SERVICE_KEYS = ["carpet", "carpet_home", "sofa", "mattress", "curtains"]
@@ -995,8 +1016,10 @@ async def calc_service_type(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     svctype = cb.data.replace("svctype_","")
     user_data_db[uid]["calc_svctype"] = svctype
+    svc = user_data_db[uid].get("calc_svc","carpet")
     await state.set_state(CalcForm.width)
-    await cb.message.answer(t(uid,"calc_ask_w"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
+    header = t(uid,"calc_selected_header").format(svc=svc_display_name(uid, svc, svctype))
+    await cb.message.answer(header + "\n\n" + t(uid,"calc_ask_w"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
 
 @dp.message(CalcForm.width)
 async def calc_width(msg: Message, state: FSMContext):
@@ -1024,24 +1047,25 @@ async def calc_length(msg: Message, state: FSMContext):
     svctype = d.get("calc_svctype","standard")
     w       = d.get("calc_w",200)
     sqm_real = (w/100) * (l/100)
-    sqm_bill = max(sqm_real, 10)
+    if svc in MIN_ORDER_SERVICES:
+        sqm_bill = max(sqm_real, 10)
+    else:
+        sqm_bill = sqm_real
     price    = get_cached_price(svc, svctype)
     total    = int(sqm_bill * price)
-    svc_key_map = {
-        "carpet":      "btn_svc_carpet",
-        "carpet_home": "btn_svc_carpet_home",
-        "sofa":        "btn_svc_sofa",
-        "mattress":    "btn_svc_mattress",
-        "curtains":    "btn_svc_curtains",
-    }
-    type_key_map = {"standard": "btn_type_standard", "express": "btn_type_express"}
-    svc_name  = t(uid, svc_key_map.get(svc, "btn_svc_carpet"))
-    type_name = t(uid, type_key_map.get(svctype, "btn_type_standard"))
-    result = t(uid,"calc_result").format(
-        w=int(w), l=int(l), sqm=round(sqm_real,2),
-        svc=f"{svc_name} ({type_name})", price=f"{price:,}".replace(","," "),
-        total=f"{total:,}".replace(","," ")
-    )
+
+    if svc in MIN_ORDER_SERVICES:
+        result = t(uid,"calc_result").format(
+            w=int(w), l=int(l), sqm=round(sqm_real,2),
+            svc=svc_display_name(uid, svc, svctype), price=f"{price:,}".replace(","," "),
+            total=f"{total:,}".replace(","," ")
+        )
+    else:
+        result = t(uid,"calc_result_no_min").format(
+            w=int(w), l=int(l), sqm=round(sqm_real,2),
+            svc=svc_display_name(uid, svc, svctype), price=f"{price:,}".replace(","," "),
+            total=f"{total:,}".replace(","," ")
+        )
     await msg.answer(result, reply_markup=back_kb(uid), parse_mode="Markdown")
     await state.clear()
 
