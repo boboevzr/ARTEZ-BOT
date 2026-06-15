@@ -19,9 +19,9 @@ from database import init_db, upsert_client, save_order, update_order_status, ge
 logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN   = os.getenv("BOT_TOKEN", "8871514482:AAGEqOUDPoAeCyyu8gvGa0ZkKRgqV28Yo5A")
-ADMIN_ID    = int(os.getenv("ADMIN_ID", "624826036"))       # ваш личный ID (для сообщений от оператора)
-GROUP_ID    = int(os.getenv("GROUP_ID", "-5211502458"))      # группа сотрудников (заявки)
-GROUP_SMS_ID = int(os.getenv("GROUP_SMS_ID", "-5303335722"))  # группа сообщений от клиентов
+ADMIN_ID    = int(os.getenv("ADMIN_ID") or "624826036")       # ваш личный ID (для сообщений от оператора)
+GROUP_ID    = int(os.getenv("GROUP_ID") or "-5211502458")      # группа сотрудников (заявки)
+GROUP_SMS_ID = int(os.getenv("GROUP_SMS_ID") or "-5303335722")  # группа сообщений от клиентов
 SHEETS_URL  = os.getenv("SHEETS_URL", "https://script.google.com/macros/s/AKfycbyU5a3pMuTFme3dBNEgu46qzA1sN1Ekw-Q7p39F1Pg872lnnXZEFhJPjuc4TzZNHlpObQ/exec")
 
 bot = Bot(token=BOT_TOKEN)
