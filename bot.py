@@ -105,8 +105,10 @@ T = {
         "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ 10 м²)_",
         "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*",
         "branches_text":  "📍 *Наши филиалы*\n\n🏢 *Филиал Зарафшан*\nОбслуживает: Зарафшан, Учкудук, Тамдинский район\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Филиал Навои*\nОбслуживает: Навои и все остальные районы области\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
-        "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка до 20%\n🚚 На все заказы — бесплатная доставка и забор\n🚗 Если у вас свой автомобиль — скидка до 20% на страховой полис ОСАГО\n📢 Подписчикам нашей Telegram-группы и Instagram — скидка до 30%\n\nПодробности у оператора 👇",
-        "info_text":      "ℹ️ *О компании ARTEZ*\n\nООО «ARTEZ» — профессиональная чистка ковров в Навоийской области.\n\n🏢 Два филиала: Зарафшан и Навои\n🚚 Бесплатный вывоз и доставка\n⚡ Срок чистки от 24 часов\n🛡 Бережное отношение к коврам\n\n🌐 artez.uz\n📢 Telegram-группа: @artez_gilam_yuvish\n\n☎️ Короткий номер: 1221\n📞 Оператор: +998 79 222 12 21\n\n*г. Зарафшан*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*г. Навои*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
+        "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка до 20%\n🚚 На все заказы — бесплатная доставка и забор\n🚗 Если у вас свой автомобиль — скидка до 20% на страховой полис ОСАГО\n📢 Подписчикам нашей Telegram-группы и Instagram — скидка до 30%\n\nПодпишитесь и получите скидку 👇",
+        "btn_promo_telegram": "📢 Telegram-группа",
+        "btn_promo_instagram": "📸 Instagram",
+        "info_text":      "ℹ️ *О компании ARTEZ*\n\nООО «ARTEZ» — профессиональная чистка ковров в Навоийской области.\n\n🏢 Два филиала: Зарафшан и Навои\n🚚 Бесплатный вывоз и доставка\n⚡ Срок чистки от 24 часов\n🛡 Бережное отношение к коврам\n\n🌐 artez.uz\n📢 Telegram-группа: @artez_gilam_yuvish\n📸 Instagram: [@ziyoboboev](https://www.instagram.com/ziyoboboev/)\n\n☎️ Короткий номер: 1221\n📞 Оператор: +998 79 222 12 21\n\n*г. Зарафшан*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*г. Навои*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Помощь*\n\n/start — Главное меню\n/order — Оставить заявку\n/calc — Калькулятор\n/prices — Цены\n/branches — Филиалы\n\nПо всем вопросам: 📞 1221",
         "status_text":    "📦 *Статус заказа*\n\nДля проверки статуса заказа позвоните нам:\n📞 1221\n📱 +998 79 222-12-21\n\nИли напишите оператору 👇",
         "status_menu_title": "📦 *Статус заказа*\n\nВыберите категорию:",
@@ -192,8 +194,10 @@ T = {
         "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma 10 m²)_",
         "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*",
         "branches_text":  "📍 *Filiallarimiz*\n\n🏢 *Zarafshon filiali*\nXizmat ko'rsatadi: Zarafshon, Uchquduq, Tomdi tumani\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Navoiy filiali*\nXizmat ko'rsatadi: Navoiy va viloyatning boshqa tumanlari\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
-        "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam buyurtma qilsangiz — 20% gacha chegirma\n🚚 Barcha buyurtmalar uchun — bepul olib ketish va yetkazish\n🚗 Agar shaxsiy avtomobilingiz bo'lsa — OSAGO sug'urta polisiga 20% gacha chegirma\n📢 Telegram-guruhimiz va Instagram'ga obuna bo'lganlar uchun — 30% gacha chegirma\n\nBatafsil operator bilan 👇",
-        "info_text":      "ℹ️ *ARTEZ haqida*\n\nARTEZ MChJ — Navoiy viloyatida professional gilam tozalash.\n\n🏢 Ikki filial: Zarafshon va Navoiy\n🚚 Bepul olib ketish va yetkazish\n⚡ Tozalash muddati 24 soatdan\n🛡 Gilamlarga ehtiyotkorona munosabat\n\n🌐 artez.uz\n📢 Telegram-guruh: @artez_gilam_yuvish\n\n☎️ Qisqa raqam: 1221\n📞 Operator: +998 79 222 12 21\n\n*Zarafshon shahri*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*Navoiy shahri*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
+        "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam buyurtma qilsangiz — 20% gacha chegirma\n🚚 Barcha buyurtmalar uchun — bepul olib ketish va yetkazish\n🚗 Agar shaxsiy avtomobilingiz bo'lsa — OSAGO sug'urta polisiga 20% gacha chegirma\n📢 Telegram-guruhimiz va Instagram'ga obuna bo'lganlar uchun — 30% gacha chegirma\n\nObuna bo'ling va chegirma oling 👇",
+        "btn_promo_telegram": "📢 Telegram-guruh",
+        "btn_promo_instagram": "📸 Instagram",
+        "info_text":      "ℹ️ *ARTEZ haqida*\n\nARTEZ MChJ — Navoiy viloyatida professional gilam tozalash.\n\n🏢 Ikki filial: Zarafshon va Navoiy\n🚚 Bepul olib ketish va yetkazish\n⚡ Tozalash muddati 24 soatdan\n🛡 Gilamlarga ehtiyotkorona munosabat\n\n🌐 artez.uz\n📢 Telegram-guruh: @artez_gilam_yuvish\n📸 Instagram: [@ziyoboboev](https://www.instagram.com/ziyoboboev/)\n\n☎️ Qisqa raqam: 1221\n📞 Operator: +998 79 222 12 21\n\n*Zarafshon shahri*\n📱 +998 88 200 12 21\n📱 +998 94 738 04 44\n\n*Navoiy shahri*\n📱 +998 99 750 00 20\n📱 +998 99 112 48 48",
         "help_text":      "🆘 *Yordam*\n\n/start — Asosiy menyu\n/order — Ariza qoldirish\n/calc — Kalkulyator\n/prices — Narxlar\n/branches — Filiallar\n\nBarcha savollar uchun: 📞 1221",
         "status_text":    "📦 *Buyurtma holati*\n\nBuyurtma holatini tekshirish uchun qo'ng'iroq qiling:\n📞 1221\n📱 +998 79 222-12-21\n\nYoki operatorga yozing 👇",
         "status_menu_title": "📦 *Buyurtma holati*\n\nKategoriyani tanlang:",
@@ -619,10 +623,17 @@ async def menu_branches(cb: CallbackQuery):
     uid = cb.from_user.id
     await cb.message.answer(t(uid,"branches_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
 
+def promo_kb(uid):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(uid,"btn_promo_telegram"),  url="https://t.me/artez_gilam_yuvish")],
+        [InlineKeyboardButton(text=t(uid,"btn_promo_instagram"), url="https://www.instagram.com/ziyoboboev/")],
+        [InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")],
+    ])
+
 @dp.callback_query(F.data == "menu_promo")
 async def menu_promo(cb: CallbackQuery):
     uid = cb.from_user.id
-    await cb.message.answer(t(uid,"promo_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
+    await cb.message.answer(t(uid,"promo_text"), reply_markup=promo_kb(uid), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "menu_info")
 async def menu_info(cb: CallbackQuery):
