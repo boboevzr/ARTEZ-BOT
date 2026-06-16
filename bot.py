@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit
 
 logging.basicConfig(level=logging.INFO)
 
@@ -105,8 +105,8 @@ T = {
         "calc_ask_w":     "Введите ширину в сантиметрах:\n\nПример: 200 (= 2 метра)",
         "calc_ask_l":     "Теперь введите длину в сантиметрах:\n\nПример: 300 (= 3 метра)",
         "calc_ask_svc":   "🧮 *Калькулятор стоимости*\n\nВыберите услугу:",
-        "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ 10 м²)_",
-        "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} м²*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/м²\n\n💵 *Итого: {total} сум*",
+        "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} {unit}*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/{unit}\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ {min_order} {unit})_",
+        "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} {unit}*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/{unit}\n\n💵 *Итого: {total} сум*",
         "branches_text":  "📍 *Наши филиалы*\n\n🏢 *Филиал Зарафшан*\nОбслуживает: Зарафшан, Учкудук, Тамдинский район\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Филиал Навои*\nОбслуживает: Навои и все остальные районы области\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка до 20%\n🚚 На все заказы — бесплатная доставка и забор\n🚗 Если у вас свой автомобиль — скидка до 20% на страховой полис ОСАГО\n📢 Подписчикам нашей Telegram-группы и Instagram — скидка до 30%\n\nПодпишитесь и получите скидку 👇",
         "btn_promo_telegram": "📢 Telegram-группа",
@@ -195,8 +195,8 @@ T = {
         "calc_ask_w":     "Enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
         "calc_ask_l":     "Endi bo'yini santimetrda kiriting:\n\nMisol: 300 (= 3 metr)",
         "calc_ask_svc":   "🧮 *Narx kalkulyatori*\n\nXizmatni tanlang:",
-        "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma 10 m²)_",
-        "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} m²*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/m²\n\n💵 *Jami: {total} so'm*",
+        "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} {unit}*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/{unit}\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma {min_order} {unit})_",
+        "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} {unit}*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/{unit}\n\n💵 *Jami: {total} so'm*",
         "branches_text":  "📍 *Filiallarimiz*\n\n🏢 *Zarafshon filiali*\nXizmat ko'rsatadi: Zarafshon, Uchquduq, Tomdi tumani\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Navoiy filiali*\nXizmat ko'rsatadi: Navoiy va viloyatning boshqa tumanlari\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam buyurtma qilsangiz — 20% gacha chegirma\n🚚 Barcha buyurtmalar uchun — bepul olib ketish va yetkazish\n🚗 Agar shaxsiy avtomobilingiz bo'lsa — OSAGO sug'urta polisiga 20% gacha chegirma\n📢 Telegram-guruhimiz va Instagram'ga obuna bo'lganlar uchun — 30% gacha chegirma\n\nObuna bo'ling va chegirma oling 👇",
         "btn_promo_telegram": "📢 Telegram-guruh",
@@ -241,16 +241,27 @@ CITIES = {
     }
 }
 
-# Кэш цен из БД: {service_key: {type_key: {"price":.., "unit":..}}}
+# Кэш цен из БД: {service_key: {type_key: {"price":.., "unit":.., "unit_key":.., "min_order":..}}}
 PRICE_CACHE = {}
+# Кэш единиц измерения: {key: {"name_ru":.., "name_uz":.., "symbol_ru":.., "symbol_uz":..}}
+UNIT_CACHE = {}
 
 # Дефолты на случай, если БД недоступна или таблица prices пуста
 DEFAULT_PRICES = {
-    "carpet":      {"standard": {"price": 12000, "unit": "sum/m2"}, "express": {"price": 16000, "unit": "sum/m2"}},
-    "carpet_home": {"standard": {"price": 14000, "unit": "sum/m2"}, "express": {"price": 18000, "unit": "sum/m2"}},
-    "sofa":        {"standard": {"price": 16000, "unit": "sum/m2"}, "express": {"price": 20000, "unit": "sum/m2"}},
-    "mattress":    {"standard": {"price": 16000, "unit": "sum/m2"}, "express": {"price": 20000, "unit": "sum/m2"}},
-    "curtains":    {"standard": {"price": 14000, "unit": "sum/m2"}, "express": {"price": 18000, "unit": "sum/m2"}},
+    "carpet":      {"standard": {"price": 12000, "unit": "sum/m2", "unit_key": "m2", "min_order": 10.0}, "express": {"price": 16000, "unit": "sum/m2", "unit_key": "m2", "min_order": 10.0}},
+    "carpet_home": {"standard": {"price": 14000, "unit": "sum/m2", "unit_key": "m2", "min_order": 10.0}, "express": {"price": 18000, "unit": "sum/m2", "unit_key": "m2", "min_order": 10.0}},
+    "sofa":        {"standard": {"price": 16000, "unit": "sum/m2", "unit_key": "m2", "min_order": None}, "express": {"price": 20000, "unit": "sum/m2", "unit_key": "m2", "min_order": None}},
+    "mattress":    {"standard": {"price": 16000, "unit": "sum/m2", "unit_key": "m2", "min_order": None}, "express": {"price": 20000, "unit": "sum/m2", "unit_key": "m2", "min_order": None}},
+    "curtains":    {"standard": {"price": 14000, "unit": "sum/m2", "unit_key": "m2", "min_order": None}, "express": {"price": 18000, "unit": "sum/m2", "unit_key": "m2", "min_order": None}},
+}
+
+DEFAULT_UNITS = {
+    "m2":  {"name_ru": "Квадратный метр", "name_uz": "Kvadrat metr", "symbol_ru": "м²", "symbol_uz": "m²"},
+    "m":   {"name_ru": "Метр",            "name_uz": "Metr",         "symbol_ru": "м",  "symbol_uz": "m"},
+    "pcs": {"name_ru": "Штука",           "name_uz": "Dona",         "symbol_ru": "шт", "symbol_uz": "dona"},
+    "cm":  {"name_ru": "Сантиметр",       "name_uz": "Santimetr",    "symbol_ru": "см", "symbol_uz": "sm"},
+    "cm2": {"name_ru": "Кв. сантиметр",   "name_uz": "Kv. santimetr","symbol_ru": "см²","symbol_uz": "sm²"},
+    "kg":  {"name_ru": "Килограмм",       "name_uz": "Kilogramm",    "symbol_ru": "кг", "symbol_uz": "kg"},
 }
 
 async def load_prices():
@@ -265,12 +276,47 @@ async def load_prices():
         data = DEFAULT_PRICES
     PRICE_CACHE = data
 
+async def load_units():
+    """Загружает единицы измерения из БД в UNIT_CACHE."""
+    global UNIT_CACHE
+    try:
+        rows = await get_all_units()
+        data = {r["key"]: {
+            "name_ru": r["name_ru"], "name_uz": r["name_uz"],
+            "symbol_ru": r["symbol_ru"], "symbol_uz": r["symbol_uz"],
+        } for r in rows}
+    except Exception as e:
+        logging.warning(f"load_units error: {e}")
+        data = {}
+    if not data:
+        data = DEFAULT_UNITS
+    UNIT_CACHE = data
+
+def get_unit_symbol(unit_key, uid=None):
+    is_uz = uid is not None and lang(uid) == "uz"
+    entry = UNIT_CACHE.get(unit_key) or DEFAULT_UNITS.get(unit_key, DEFAULT_UNITS["m2"])
+    return entry["symbol_uz"] if is_uz else entry["symbol_ru"]
+
 def get_cached_price(service_key: str, type_key: str):
     entry = PRICE_CACHE.get(service_key, {}).get(type_key)
     if entry:
         return entry["price"]
     fallback = DEFAULT_PRICES.get(service_key, {}).get(type_key)
     return fallback["price"] if fallback else 12000
+
+def get_cached_min_order(service_key: str, type_key: str):
+    entry = PRICE_CACHE.get(service_key, {}).get(type_key)
+    if entry and "min_order" in entry:
+        return entry["min_order"]
+    fallback = DEFAULT_PRICES.get(service_key, {}).get(type_key)
+    return fallback["min_order"] if fallback else None
+
+def get_cached_unit_key(service_key: str, type_key: str):
+    entry = PRICE_CACHE.get(service_key, {}).get(type_key)
+    if entry and entry.get("unit_key"):
+        return entry["unit_key"]
+    fallback = DEFAULT_PRICES.get(service_key, {}).get(type_key)
+    return fallback["unit_key"] if fallback else "m2"
 
 SVC_KEY_MAP  = {
     "carpet":      "btn_svc_carpet",
@@ -346,21 +392,29 @@ def build_prices_text(uid):
         svc_name = names.get(svc, svc)
         prices = PRICE_CACHE.get(svc, DEFAULT_PRICES.get(svc, {}))
         parts = []
+        min_orders = []
         for tk in TYPE_KEYS:
             entry = prices.get(tk)
             if entry:
-                unit_raw = entry["unit"]
-                unit = "сум/м²" if (not is_uz and unit_raw == "sum/m2") else \
-                       ("so'm/m²" if (is_uz and unit_raw == "sum/m2") else unit_raw)
+                unit_sym = get_unit_symbol(entry.get("unit_key", "m2"), uid)
                 price_str = f"{entry['price']:,}".replace(",", " ")
-                parts.append(f"{types.get(tk, tk)}: {price_str} {unit}")
-        lines.append(f"🧺 *{svc_name}*\n   " + "\n   ".join(parts))
+                currency = "so'm" if is_uz else "сум"
+                parts.append(f"{types.get(tk, tk)}: {price_str} {currency}/{unit_sym}")
+                if entry.get("min_order"):
+                    min_orders.append((entry["min_order"], unit_sym))
+        line = f"🧺 *{svc_name}*\n   " + "\n   ".join(parts)
+        if min_orders:
+            mo, unit_sym = min_orders[0]
+            mo_str = int(mo) if mo == int(mo) else mo
+            if is_uz:
+                line += f"\n   📦 Minimal buyurtma — {mo_str} {unit_sym}"
+            else:
+                line += f"\n   📦 Минимальный заказ — {mo_str} {unit_sym}"
+        lines.append(line)
     lines.append("")
     if is_uz:
-        lines.append("📦 Minimal buyurtma — 10 m²")
         lines.append("🚚 Olib ketish va yetkazish — *bepul*")
     else:
-        lines.append("📦 Минимальный заказ — 10 м²")
         lines.append("🚚 Вывоз и доставка — *бесплатно*")
     return "\n".join(lines)
 
@@ -1181,22 +1235,24 @@ async def calc_length(msg: Message, state: FSMContext):
     svctype = d.get("calc_svctype","standard")
     w       = d.get("calc_w",200)
     sqm_real = (w/100) * (l/100)
-    if svc in MIN_ORDER_SERVICES:
-        sqm_bill = max(sqm_real, 10)
+    min_order = get_cached_min_order(svc, svctype)
+    if min_order:
+        sqm_bill = max(sqm_real, min_order)
     else:
         sqm_bill = sqm_real
-    price    = get_cached_price(svc, svctype)
-    total    = int(sqm_bill * price)
+    price     = get_cached_price(svc, svctype)
+    total     = int(sqm_bill * price)
+    unit_sym  = get_unit_symbol(get_cached_unit_key(svc, svctype), uid)
 
-    if svc in MIN_ORDER_SERVICES:
+    if min_order:
         result = t(uid,"calc_result").format(
-            w=int(w), l=int(l), sqm=round(sqm_real,2),
+            w=int(w), l=int(l), sqm=round(sqm_real,2), unit=unit_sym,
             svc=svc_display_name(uid, svc, svctype), price=f"{price:,}".replace(","," "),
-            total=f"{total:,}".replace(","," ")
+            total=f"{total:,}".replace(","," "), min_order=min_order
         )
     else:
         result = t(uid,"calc_result_no_min").format(
-            w=int(w), l=int(l), sqm=round(sqm_real,2),
+            w=int(w), l=int(l), sqm=round(sqm_real,2), unit=unit_sym,
             svc=svc_display_name(uid, svc, svctype), price=f"{price:,}".replace(","," "),
             total=f"{total:,}".replace(","," ")
         )
@@ -1422,21 +1478,30 @@ async def cmd_setprice(msg: Message):
     if msg.from_user.id != ADMIN_ID:
         return
     args = (msg.text or "").split()[1:]
-    if len(args) != 3:
+    if len(args) < 3 or len(args) > 5:
         await msg.answer(
-            "⚠️ Формат: `/setprice <услуга> <тип> <цена>`\n"
+            "⚠️ Формат: `/setprice <услуга> <тип> <цена> [ед.изм] [мин.заказ]`\n"
             f"Услуги: {', '.join(SERVICE_KEYS)}\n"
             f"Типы: {', '.join(TYPE_KEYS)}\n"
-            "Пример: `/setprice carpet standard 13000`",
+            f"Ед. изм: {', '.join(DEFAULT_UNITS.keys())}\n"
+            "Примеры:\n"
+            "`/setprice carpet standard 13000`\n"
+            "`/setprice carpet standard 13000 m2 10` (мин. заказ 10 м²)",
             parse_mode="Markdown"
         )
         return
-    svc, tk, price_str = args
+    svc, tk, price_str = args[0], args[1], args[2]
+    unit_key  = args[3] if len(args) >= 4 else None
+    min_order_str = args[4] if len(args) >= 5 else None
+
     if svc not in SERVICE_KEYS:
         await msg.answer(f"⚠️ Неизвестная услуга `{svc}`. Доступны: {', '.join(SERVICE_KEYS)}", parse_mode="Markdown")
         return
     if tk not in TYPE_KEYS:
         await msg.answer(f"⚠️ Неизвестный тип `{tk}`. Доступны: {', '.join(TYPE_KEYS)}", parse_mode="Markdown")
+        return
+    if unit_key and unit_key not in DEFAULT_UNITS and unit_key not in UNIT_CACHE:
+        await msg.answer(f"⚠️ Неизвестная ед. изм. `{unit_key}`. Доступны: {', '.join(DEFAULT_UNITS.keys())}", parse_mode="Markdown")
         return
     try:
         price = int(price_str)
@@ -1445,12 +1510,28 @@ async def cmd_setprice(msg: Message):
     except ValueError:
         await msg.answer("⚠️ Цена должна быть положительным целым числом.")
         return
-    ok = await set_price(svc, tk, price)
+    min_order = None
+    if min_order_str:
+        try:
+            min_order = float(min_order_str)
+            if min_order <= 0:
+                raise ValueError
+        except ValueError:
+            await msg.answer("⚠️ Минимальный заказ должен быть положительным числом.")
+            return
+
+    unit_str = f"sum/{unit_key}" if unit_key else None
+    ok = await set_price(svc, tk, price, unit=unit_str, unit_key=unit_key, min_order=min_order)
     if ok:
         await load_prices()
+        extra = ""
+        if unit_key:
+            extra += f", ед.изм: {unit_key}"
+        if min_order:
+            extra += f", мин.заказ: {min_order}"
         await msg.answer(
             f"✅ Цена обновлена: {SERVICE_NAMES_RU.get(svc, svc)} / {TYPE_NAMES_RU.get(tk, tk)} = "
-            f"{price:,}".replace(",", " ") + " сум"
+            f"{price:,}".replace(",", " ") + f" сум{extra}"
         )
     else:
         await msg.answer("⚠️ Не удалось обновить цену (БД недоступна).")
@@ -1527,6 +1608,7 @@ async def main():
     logging.info("🚀 ARTEZ Bot starting...")
     await init_db()
     await load_prices()
+    await load_units()
     logging.info("✅ Bot started, polling...")
     await dp.start_polling(bot)
 

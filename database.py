@@ -141,17 +141,36 @@ async def create_tables():
         );
 
         -- ══════════════════════════════════════
+        --  ЕДИНИЦЫ ИЗМЕРЕНИЯ
+        -- ══════════════════════════════════════
+        CREATE TABLE IF NOT EXISTS units (
+            id          SERIAL PRIMARY KEY,
+            key         VARCHAR(20) UNIQUE NOT NULL,  -- m2, m, pcs, cm, cm2, kg
+            name_ru     VARCHAR(50) NOT NULL,          -- м², м, шт, см, см², кг
+            name_uz     VARCHAR(50) NOT NULL,          -- m², m, dona, sm, sm², kg
+            symbol_ru   VARCHAR(10) NOT NULL,          -- м²
+            symbol_uz   VARCHAR(10) NOT NULL,          -- m²
+            created_at  TIMESTAMP DEFAULT NOW()
+        );
+
+        -- ══════════════════════════════════════
         --  ЦЕНЫ НА УСЛУГИ
         -- ══════════════════════════════════════
         CREATE TABLE IF NOT EXISTS prices (
             id              SERIAL PRIMARY KEY,
-            service_key     VARCHAR(30) NOT NULL,   -- carpet, carpet_home, sofa, mattress, curtains
-            type_key        VARCHAR(20) NOT NULL,   -- standard, express
+            service_key     VARCHAR(30) NOT NULL,
+            type_key        VARCHAR(20) NOT NULL,
             price           INT NOT NULL,
             unit            VARCHAR(20) DEFAULT 'sum/m2',
+            unit_key        VARCHAR(20) DEFAULT 'm2',
+            min_order       NUMERIC(10,2) DEFAULT NULL,
             updated_at      TIMESTAMP DEFAULT NOW(),
             UNIQUE(service_key, type_key)
         );
+
+        -- Добавляем новые колонки если их нет (для существующих таблиц)
+        ALTER TABLE prices ADD COLUMN IF NOT EXISTS unit_key VARCHAR(20) DEFAULT 'm2';
+        ALTER TABLE prices ADD COLUMN IF NOT EXISTS min_order NUMERIC(10,2) DEFAULT NULL;
 
         -- Индексы
         CREATE INDEX IF NOT EXISTS idx_orders_client   ON orders(client_tg_id);
@@ -161,24 +180,41 @@ async def create_tables():
         CREATE INDEX IF NOT EXISTS idx_clients_tg_id   ON clients(tg_id);
         """)
 
+        # Дефолтные единицы измерения
+        units_count = await conn.fetchval("SELECT COUNT(*) FROM units")
+        if units_count == 0:
+            default_units = [
+                ("m2",  "Квадратный метр", "kvadrat metr",  "м²",  "m²"),
+                ("m",   "Метр",            "metr",          "м",   "m"),
+                ("pcs", "Штука",           "dona",          "шт",  "dona"),
+                ("cm",  "Сантиметр",       "santimetr",     "см",  "sm"),
+                ("cm2", "Кв. сантиметр",   "kv. santimetr", "см²", "sm²"),
+                ("kg",  "Килограмм",       "kilogramm",     "кг",  "kg"),
+            ]
+            await conn.executemany("""
+                INSERT INTO units (key, name_ru, name_uz, symbol_ru, symbol_uz)
+                VALUES ($1, $2, $3, $4, $5)
+                ON CONFLICT (key) DO NOTHING
+            """, default_units)
+
         # Дефолтные цены — добавляются только если таблица prices ещё пуста
         count = await conn.fetchval("SELECT COUNT(*) FROM prices")
         if count == 0:
             defaults = [
-                ("carpet",      "standard", 12000, "sum/m2"),
-                ("carpet",      "express",  16000, "sum/m2"),
-                ("carpet_home", "standard", 14000, "sum/m2"),
-                ("carpet_home", "express",  18000, "sum/m2"),
-                ("sofa",        "standard", 16000, "sum/m2"),
-                ("sofa",        "express",  20000, "sum/m2"),
-                ("mattress",    "standard", 16000, "sum/m2"),
-                ("mattress",    "express",  20000, "sum/m2"),
-                ("curtains",    "standard", 14000, "sum/m2"),
-                ("curtains",    "express",  18000, "sum/m2"),
+                ("carpet",      "standard", 12000, "sum/m2", "m2",  10.0),
+                ("carpet",      "express",  16000, "sum/m2", "m2",  10.0),
+                ("carpet_home", "standard", 14000, "sum/m2", "m2",  10.0),
+                ("carpet_home", "express",  18000, "sum/m2", "m2",  10.0),
+                ("sofa",        "standard", 16000, "sum/m2", "m2",  None),
+                ("sofa",        "express",  20000, "sum/m2", "m2",  None),
+                ("mattress",    "standard", 16000, "sum/m2", "m2",  None),
+                ("mattress",    "express",  20000, "sum/m2", "m2",  None),
+                ("curtains",    "standard", 14000, "sum/m2", "m2",  None),
+                ("curtains",    "express",  18000, "sum/m2", "m2",  None),
             ]
             await conn.executemany("""
-                INSERT INTO prices (service_key, type_key, price, unit)
-                VALUES ($1, $2, $3, $4)
+                INSERT INTO prices (service_key, type_key, price, unit, unit_key, min_order)
+                VALUES ($1, $2, $3, $4, $5, $6)
                 ON CONFLICT (service_key, type_key) DO NOTHING
             """, defaults)
 
@@ -356,16 +392,18 @@ async def get_stats(branch: str = None):
 #  ЦЕНЫ НА УСЛУГИ
 # ══════════════════════════════════════
 async def get_all_prices() -> dict:
-    """Возвращает все цены в виде {service_key: {type_key: {"price":..,"unit":..}}}"""
+    """Возвращает все цены в виде {service_key: {type_key: {"price":.., "unit":.., "unit_key":.., "min_order":..}}}"""
     if not pool:
         return {}
     async with pool.acquire() as conn:
-        rows = await conn.fetch("SELECT service_key, type_key, price, unit FROM prices")
+        rows = await conn.fetch("SELECT service_key, type_key, price, unit, unit_key, min_order FROM prices")
     result = {}
     for r in rows:
         result.setdefault(r["service_key"], {})[r["type_key"]] = {
             "price": r["price"],
             "unit": r["unit"],
+            "unit_key": r["unit_key"],
+            "min_order": float(r["min_order"]) if r["min_order"] is not None else None,
         }
     return result
 
@@ -382,29 +420,68 @@ async def get_price(service_key: str, type_key: str):
     return row["price"] if row else None
 
 
-async def set_price(service_key: str, type_key: str, price: int, unit: str = None) -> bool:
+async def set_price(service_key: str, type_key: str, price: int, unit: str = None,
+                     unit_key: str = None, min_order=None) -> bool:
     """Устанавливает (или создаёт) цену для услуги/типа. Возвращает True при успехе."""
     if not pool:
         return False
     async with pool.acquire() as conn:
-        if unit:
-            await conn.execute("""
-                INSERT INTO prices (service_key, type_key, price, unit, updated_at)
-                VALUES ($1, $2, $3, $4, NOW())
-                ON CONFLICT (service_key, type_key) DO UPDATE SET
-                    price = EXCLUDED.price,
-                    unit  = EXCLUDED.unit,
-                    updated_at = NOW()
-            """, service_key, type_key, price, unit)
-        else:
-            await conn.execute("""
-                INSERT INTO prices (service_key, type_key, price, updated_at)
-                VALUES ($1, $2, $3, NOW())
-                ON CONFLICT (service_key, type_key) DO UPDATE SET
-                    price = EXCLUDED.price,
-                    updated_at = NOW()
-            """, service_key, type_key, price)
+        await conn.execute("""
+            INSERT INTO prices (service_key, type_key, price, unit, unit_key, min_order, updated_at)
+            VALUES ($1, $2, $3,
+                    COALESCE($4, 'sum/m2'),
+                    COALESCE($5, 'm2'),
+                    $6, NOW())
+            ON CONFLICT (service_key, type_key) DO UPDATE SET
+                price      = EXCLUDED.price,
+                unit       = COALESCE($4, prices.unit),
+                unit_key   = COALESCE($5, prices.unit_key),
+                min_order  = $6,
+                updated_at = NOW()
+        """, service_key, type_key, price, unit, unit_key, min_order)
     return True
+
+
+# ══════════════════════════════════════
+#  ЕДИНИЦЫ ИЗМЕРЕНИЯ
+# ══════════════════════════════════════
+async def get_all_units():
+    """Возвращает список всех единиц измерения"""
+    if not pool:
+        return []
+    async with pool.acquire() as conn:
+        return await conn.fetch("SELECT * FROM units ORDER BY id")
+
+
+async def get_unit(key: str):
+    if not pool:
+        return None
+    async with pool.acquire() as conn:
+        return await conn.fetchrow("SELECT * FROM units WHERE key=$1", key)
+
+
+async def add_unit(key: str, name_ru: str, name_uz: str, symbol_ru: str, symbol_uz: str) -> bool:
+    if not pool:
+        return False
+    async with pool.acquire() as conn:
+        await conn.execute("""
+            INSERT INTO units (key, name_ru, name_uz, symbol_ru, symbol_uz)
+            VALUES ($1, $2, $3, $4, $5)
+            ON CONFLICT (key) DO UPDATE SET
+                name_ru = EXCLUDED.name_ru,
+                name_uz = EXCLUDED.name_uz,
+                symbol_ru = EXCLUDED.symbol_ru,
+                symbol_uz = EXCLUDED.symbol_uz
+        """, key, name_ru, name_uz, symbol_ru, symbol_uz)
+    return True
+
+
+async def delete_unit(key: str) -> bool:
+    if not pool:
+        return False
+    async with pool.acquire() as conn:
+        result = await conn.execute("DELETE FROM units WHERE key=$1", key)
+    return result != "DELETE 0"
 
 
 # ══════════════════════════════════════
