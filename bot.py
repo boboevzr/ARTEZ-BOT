@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, set_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit
 
 logging.basicConfig(level=logging.INFO)
 
@@ -1454,87 +1454,6 @@ async def cmd_branches(msg: Message):
     if uid not in user_lang:
         await msg.answer("👋", reply_markup=lang_kb()); return
     await msg.answer(t(uid,"branches_text"), reply_markup=back_kb(uid), parse_mode="Markdown")
-
-# ── АДМИН: ЦЕНЫ ──
-@dp.message(Command("prices_admin"))
-async def cmd_prices_admin(msg: Message):
-    if msg.from_user.id != ADMIN_ID:
-        return
-    lines = ["💰 *Текущие цены* (ключ для /setprice)", ""]
-    for svc in SERVICE_KEYS:
-        prices = PRICE_CACHE.get(svc, DEFAULT_PRICES.get(svc, {}))
-        lines.append(f"*{SERVICE_NAMES_RU.get(svc, svc)}* (`{svc}`)")
-        for tk in TYPE_KEYS:
-            entry = prices.get(tk)
-            if entry:
-                lines.append(f"   {TYPE_NAMES_RU.get(tk, tk)} (`{tk}`): {entry['price']:,}".replace(",", " ") + " сум")
-        lines.append("")
-    lines.append("Изменить: `/setprice <услуга> <тип> <цена>`")
-    lines.append("Пример: `/setprice carpet standard 13000`")
-    await msg.answer("\n".join(lines), parse_mode="Markdown")
-
-@dp.message(Command("setprice"))
-async def cmd_setprice(msg: Message):
-    if msg.from_user.id != ADMIN_ID:
-        return
-    args = (msg.text or "").split()[1:]
-    if len(args) < 3 or len(args) > 5:
-        await msg.answer(
-            "⚠️ Формат: `/setprice <услуга> <тип> <цена> [ед.изм] [мин.заказ]`\n"
-            f"Услуги: {', '.join(SERVICE_KEYS)}\n"
-            f"Типы: {', '.join(TYPE_KEYS)}\n"
-            f"Ед. изм: {', '.join(DEFAULT_UNITS.keys())}\n"
-            "Примеры:\n"
-            "`/setprice carpet standard 13000`\n"
-            "`/setprice carpet standard 13000 m2 10` (мин. заказ 10 м²)",
-            parse_mode="Markdown"
-        )
-        return
-    svc, tk, price_str = args[0], args[1], args[2]
-    unit_key  = args[3] if len(args) >= 4 else None
-    min_order_str = args[4] if len(args) >= 5 else None
-
-    if svc not in SERVICE_KEYS:
-        await msg.answer(f"⚠️ Неизвестная услуга `{svc}`. Доступны: {', '.join(SERVICE_KEYS)}", parse_mode="Markdown")
-        return
-    if tk not in TYPE_KEYS:
-        await msg.answer(f"⚠️ Неизвестный тип `{tk}`. Доступны: {', '.join(TYPE_KEYS)}", parse_mode="Markdown")
-        return
-    if unit_key and unit_key not in DEFAULT_UNITS and unit_key not in UNIT_CACHE:
-        await msg.answer(f"⚠️ Неизвестная ед. изм. `{unit_key}`. Доступны: {', '.join(DEFAULT_UNITS.keys())}", parse_mode="Markdown")
-        return
-    try:
-        price = int(price_str)
-        if price <= 0:
-            raise ValueError
-    except ValueError:
-        await msg.answer("⚠️ Цена должна быть положительным целым числом.")
-        return
-    min_order = None
-    if min_order_str:
-        try:
-            min_order = float(min_order_str)
-            if min_order <= 0:
-                raise ValueError
-        except ValueError:
-            await msg.answer("⚠️ Минимальный заказ должен быть положительным числом.")
-            return
-
-    unit_str = f"sum/{unit_key}" if unit_key else None
-    ok = await set_price(svc, tk, price, unit=unit_str, unit_key=unit_key, min_order=min_order)
-    if ok:
-        await load_prices()
-        extra = ""
-        if unit_key:
-            extra += f", ед.изм: {unit_key}"
-        if min_order:
-            extra += f", мин.заказ: {min_order}"
-        await msg.answer(
-            f"✅ Цена обновлена: {SERVICE_NAMES_RU.get(svc, svc)} / {TYPE_NAMES_RU.get(tk, tk)} = "
-            f"{price:,}".replace(",", " ") + f" сум{extra}"
-        )
-    else:
-        await msg.answer("⚠️ Не удалось обновить цену (БД недоступна).")
 
 # ── АДМИН: ВОДИТЕЛИ ──
 @dp.message(Command("add_driver"))
