@@ -264,9 +264,14 @@ DEFAULT_UNITS = {
     "kg":  {"name_ru": "Килограмм",       "name_uz": "Kilogramm",    "symbol_ru": "кг", "symbol_uz": "kg"},
 }
 
+import time as _time
+_PRICE_CACHE_TS = 0.0
+_UNIT_CACHE_TS  = 0.0
+PRICE_TTL = 60  # секунд — обновляем кэш цен каждую минуту
+
 async def load_prices():
     """Загружает цены из БД в PRICE_CACHE. При ошибке/пустой БД использует дефолты."""
-    global PRICE_CACHE
+    global PRICE_CACHE, _PRICE_CACHE_TS
     try:
         data = await get_all_prices()
     except Exception as e:
@@ -275,10 +280,11 @@ async def load_prices():
     if not data:
         data = DEFAULT_PRICES
     PRICE_CACHE = data
+    _PRICE_CACHE_TS = _time.monotonic()
 
 async def load_units():
     """Загружает единицы измерения из БД в UNIT_CACHE."""
-    global UNIT_CACHE
+    global UNIT_CACHE, _UNIT_CACHE_TS
     try:
         rows = await get_all_units()
         data = {r["key"]: {
@@ -291,6 +297,14 @@ async def load_units():
     if not data:
         data = DEFAULT_UNITS
     UNIT_CACHE = data
+    _UNIT_CACHE_TS = _time.monotonic()
+
+async def ensure_prices_fresh():
+    """Перезагружает кэш если прошло больше PRICE_TTL секунд."""
+    if _time.monotonic() - _PRICE_CACHE_TS > PRICE_TTL:
+        await load_prices()
+    if _time.monotonic() - _UNIT_CACHE_TS > PRICE_TTL:
+        await load_units()
 
 def get_unit_symbol(unit_key, uid=None):
     is_uz = uid is not None and lang(uid) == "uz"
@@ -317,6 +331,7 @@ def get_cached_unit_key(service_key: str, type_key: str):
         return entry["unit_key"]
     fallback = DEFAULT_PRICES.get(service_key, {}).get(type_key)
     return fallback["unit_key"] if fallback else "m2"
+
 
 SVC_KEY_MAP  = {
     "carpet":      "btn_svc_carpet",
@@ -675,6 +690,7 @@ async def go_menu(cb: CallbackQuery, state: FSMContext):
 @dp.callback_query(F.data == "menu_prices")
 async def menu_prices(cb: CallbackQuery):
     uid = cb.from_user.id
+    await ensure_prices_fresh()
     await cb.message.answer(build_prices_text(uid), reply_markup=back_kb(uid), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "menu_branches")
@@ -1183,6 +1199,7 @@ async def cancel_order(cb: CallbackQuery, state: FSMContext):
 async def menu_calc(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     user_data_db[uid] = {}
+    await ensure_prices_fresh()
     await state.set_state(CalcForm.service)
     await cb.message.answer(t(uid,"calc_ask_svc"), reply_markup=service_kb(uid), parse_mode="Markdown")
     await cb.answer()
@@ -1446,6 +1463,7 @@ async def cmd_prices(msg: Message):
     uid = msg.from_user.id
     if uid not in user_lang:
         await msg.answer("👋", reply_markup=lang_kb()); return
+    await ensure_prices_fresh()
     await msg.answer(build_prices_text(uid), reply_markup=back_kb(uid), parse_mode="Markdown")
 
 @dp.message(Command("branches"))
