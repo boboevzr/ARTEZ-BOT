@@ -606,11 +606,15 @@ def phone_kb(uid):
         resize_keyboard=True, one_time_keyboard=True
     )
 
+LOCATION_PICKER_URL = "https://artez.uz/location_picker.html"
+
 def location_kb(uid):
-    """ReplyKeyboard с кнопками Отправить локацию и Пропустить"""
+    """ReplyKeyboard: GPS / выбрать на карте / пропустить"""
     return ReplyKeyboardMarkup(
         keyboard=[[
             KeyboardButton(text=t(uid,"btn_send_loc"), request_location=True),
+            KeyboardButton(text="🗺 Выбрать на карте", web_app=WebAppInfo(url=LOCATION_PICKER_URL)),
+        ],[
             KeyboardButton(text=t(uid,"btn_skip_loc")),
         ]],
         resize_keyboard=True, one_time_keyboard=True
@@ -681,15 +685,17 @@ async def send_to_sheets(data: dict):
     except Exception as e:
         logging.warning(f"Sheets error: {e}")
 
-async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None, username: str = None):
+async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None, username: str = None, location_url: str = None):
     """Отправляет заявку в группу сотрудников с кнопками действий"""
-    kb = None
+    kb_rows = []
+    if location_url:
+        kb_rows.append([InlineKeyboardButton(text="🗺 Открыть на карте", url=location_url)])
     if order_num and client_id:
         if username:
             msg_button = InlineKeyboardButton(text="✉️ Написать", url=f"https://t.me/{username}")
         else:
             msg_button = InlineKeyboardButton(text="✉️ Написать", url=f"tg://user?id={client_id}")
-        kb = InlineKeyboardMarkup(inline_keyboard=[
+        kb_rows.extend([
             [
                 InlineKeyboardButton(text="✅ Принять заказ",  callback_data=f"accept_{order_num}_{client_id}"),
                 msg_button,
@@ -699,6 +705,7 @@ async def notify_group(text: str, order_num: int = None, client_id: int = None, 
                 InlineKeyboardButton(text="❌ Отклонить",          callback_data=f"reject_{order_num}_{client_id}"),
             ],
         ])
+    kb = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
     try:
         await bot.send_message(GROUP_ID, text, reply_markup=kb)
     except Exception as e:
@@ -1075,22 +1082,43 @@ async def order_address(msg: Message, state: FSMContext):
         parse_mode="Markdown"
     )
 
-# Клиент отправил локацию
+# Клиент отправил GPS-локацию (нативная кнопка Telegram)
 @dp.message(OrderForm.location, F.location)
 async def order_location_geo(msg: Message, state: FSMContext):
     uid = msg.from_user.id
     lat = msg.location.latitude
     lon = msg.location.longitude
-    user_data_db[uid]["location"] = f"{lat:.5f}, {lon:.5f}"
+    user_data_db[uid]["location"]         = f"{lat:.5f}, {lon:.5f}"
+    user_data_db[uid]["location_address"] = ""
     await state.set_state(OrderForm.service)
     await msg.answer("📍 ✅", reply_markup=ReplyKeyboardRemove())
+    await msg.answer(t(uid,"ask_service"), reply_markup=service_kb(uid))
+
+# Клиент выбрал точку на карте (Telegram Mini App)
+@dp.message(OrderForm.location, F.web_app_data)
+async def order_location_webapp(msg: Message, state: FSMContext):
+    import json as _json
+    uid = msg.from_user.id
+    try:
+        data = _json.loads(msg.web_app_data.data)
+        la, lo = float(data["lat"]), float(data["lon"])
+        user_data_db[uid]["location"]         = f"{la:.5f}, {lo:.5f}"
+        user_data_db[uid]["location_address"] = data.get("address", "")
+    except Exception as e:
+        logging.warning(f"WebApp location parse error: {e}")
+        user_data_db[uid]["location"]         = ""
+        user_data_db[uid]["location_address"] = ""
+    await state.set_state(OrderForm.service)
+    addr_txt = user_data_db[uid].get("location_address") or user_data_db[uid].get("location") or ""
+    await msg.answer(f"📍 ✅ {addr_txt}", reply_markup=ReplyKeyboardRemove())
     await msg.answer(t(uid,"ask_service"), reply_markup=service_kb(uid))
 
 # Клиент нажал «Пропустить»
 @dp.message(OrderForm.location, F.text)
 async def order_location_skip(msg: Message, state: FSMContext):
     uid = msg.from_user.id
-    user_data_db[uid]["location"] = ""
+    user_data_db[uid]["location"]         = ""
+    user_data_db[uid]["location_address"] = ""
     await state.set_state(OrderForm.service)
     await msg.answer("⏭", reply_markup=ReplyKeyboardRemove())
     await msg.answer(t(uid,"ask_service"), reply_markup=service_kb(uid))
@@ -1235,7 +1263,16 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
     )
 
     # Уведомление в группу
-    loc = d.get("location","") or "—"
+    loc_raw  = d.get("location","") or ""
+    loc_addr = d.get("location_address","") or ""
+    loc_display = loc_addr if loc_addr else (loc_raw.strip() if loc_raw else "—")
+    location_url = None
+    if loc_raw:
+        try:
+            la_s, lo_s = loc_raw.split(",", 1)
+            location_url = f"https://yandex.uz/maps/?pt={lo_s.strip()},{la_s.strip()}&z=16"
+        except Exception:
+            pass
     summary = (
         f"📋 Новая заявка {order_num} (бот)\n"
         f"━━━━━━━━━━\n"
@@ -1245,7 +1282,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         f"🏢 {md_escape(d.get('branch_name',''))}\n"
         f"📍 {md_escape(d.get('city',''))}\n"
         f"🏠 {md_escape(d.get('address',''))}\n"
-        f"🗺 {md_escape(loc)}\n"
+        f"🗺 {md_escape(loc_display)}\n"
         f"🧺 {md_escape(d.get('service',''))}\n"
         f"⚙️ {md_escape(d.get('service_type',''))}\n"
         f"📅 {md_escape(d.get('date',''))}\n"
@@ -1255,7 +1292,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
     )
     raw_phone = (d.get("phone","") or "").strip()
     client_phone = re.sub(r"[\s\-]", "", raw_phone)
-    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone, username=username)
+    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone, username=username, location_url=location_url)
 
     # В Google Таблицу
     await send_to_sheets({
