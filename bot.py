@@ -25,6 +25,96 @@ GROUP_ID    = int(os.getenv("GROUP_ID") or "-5211502458")      # группа с
 GROUP_SMS_ID = int(os.getenv("GROUP_SMS_ID") or "-5303335722")  # группа сообщений от клиентов
 SHEETS_URL  = os.getenv("SHEETS_URL", "https://script.google.com/macros/s/AKfycbyU5a3pMuTFme3dBNEgu46qzA1sN1Ekw-Q7p39F1Pg872lnnXZEFhJPjuc4TzZNHlpObQ/exec")
 WEBSITE_URL = os.getenv("WEBSITE_URL", "https://artez.uz")
+API_URL     = os.getenv("API_URL", "https://artez-api-production.up.railway.app/api")
+
+# Настройки сайта — загружаются при старте из API, используются во всех сообщениях
+SITE = {
+    "contact_short":      "1221",
+    "contact_main":       "+998 79 222-12-21",
+    "contact_zarafshan_1": "+998 88 200-12-21",
+    "contact_zarafshan_2": "+998 94 738-04-44",
+    "contact_navoi_1":    "+998 99 750-00-20",
+    "contact_navoi_2":    "+998 99 112-48-48",
+    "social_tg_group":    "https://t.me/artez_gilam_yuvish",
+    "social_tg_bot":      "https://t.me/artez_orders_bot",
+    "social_instagram":   "https://www.instagram.com/ziyoboboev/",
+}
+
+async def load_site_settings():
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{API_URL}/settings/site", timeout=aiohttp.ClientTimeout(total=5)) as r:
+                if r.status == 200:
+                    data = await r.json()
+                    s = data.get("settings", {})
+                    for k, v in s.items():
+                        if v:
+                            SITE[k] = v
+                    _rebuild_dynamic_texts()
+                    logging.info("✅ Site settings loaded from API")
+    except Exception as e:
+        logging.warning(f"Could not load site settings: {e}")
+
+def _rebuild_dynamic_texts():
+    """Обновляет строки в TEXTS которые содержат номера телефонов и ссылки."""
+    sh  = SITE["contact_short"]
+    mn  = SITE["contact_main"]
+    z1  = SITE["contact_zarafshan_1"]
+    z2  = SITE["contact_zarafshan_2"]
+    n1  = SITE["contact_navoi_1"]
+    n2  = SITE["contact_navoi_2"]
+    tg  = SITE["social_tg_group"]
+    ins = SITE["social_instagram"]
+
+    TEXTS["ru"]["menu_title"] = (
+        f"🏠 Главное меню\n\nООО «ARTEZ» — профессиональная чистка ковров\n"
+        f"📍 Зарафшан и Навои\n🌐 [artez.uz](https://artez.uz)\n\n"
+        f"☎️ Короткий номер: {sh}\n📞 Оператор:\n{mn}\n\n"
+        f"*г. Зарафшан*\n📱 {z1}\n📱 {z2}\n\n"
+        f"*г. Навои*\n📱 {n1}\n📱 {n2}"
+    )
+    TEXTS["uz"]["menu_title"] = (
+        f"🏠 Asosiy menyu\n\nARTEZ MChJ — professional gilam tozalash\n"
+        f"📍 Zarafshon va Navoiy\n🌐 [artez.uz](https://artez.uz)\n\n"
+        f"☎️ Qisqa raqam: {sh}\n📞 Operator:\n{mn}\n\n"
+        f"*Zarafshon shahri*\n📱 {z1}\n📱 {z2}\n\n"
+        f"*Navoiy shahri*\n📱 {n1}\n📱 {n2}"
+    )
+    TEXTS["ru"]["order_done"] = (
+        f"✅ *Заявка принята!*\n\nМы перезвоним вам в течение 30 минут.\n\n"
+        f"Номер заявки: *#{{num}}*\n\n"
+        f"☎️ Короткий номер: *{sh}*\n📞 {mn}\n\n"
+        f"*Зарафшан:* {z1} / {z2}\n*Навои:* {n1} / {n2}"
+    )
+    TEXTS["uz"]["order_done"] = (
+        f"✅ *Ariza qabul qilindi!*\n\n30 daqiqa ichida qayta qo'ng'iroq qilamiz.\n\n"
+        f"Ariza raqami: *#{{num}}*\n\n"
+        f"☎️ Qisqa raqam: *{sh}*\n📞 {mn}\n\n"
+        f"*Zarafshon:* {z1} / {z2}\n*Navoiy:* {n1} / {n2}"
+    )
+    TEXTS["ru"]["order_rejected"] = (
+        f"❌ К сожалению, заявка *{{num}}* не может быть выполнена.\n\n"
+        f"Позвоните нам:\n☎️ {sh}\n📞 {mn}"
+    )
+    TEXTS["uz"]["order_rejected"] = (
+        f"❌ Afsuski, *{{num}}* arizasi bajarilishi mumkin emas.\n\n"
+        f"Bizga qo'ng'iroq qiling:\n☎️ {sh}\n📞 {mn}"
+    )
+    TEXTS["ru"]["branches_text"] = (
+        f"📍 *Наши филиалы*\n\n"
+        f"🏢 *Филиал Зарафшан*\nОбслуживает: Зарафшан, Учкудук, Тамдинский район\n"
+        f"📞 {sh}\n📱 {mn}\n📱 {z1}\n📱 {z2}\n\n"
+        f"🏢 *Филиал Навои*\nОбслуживает: Навои и все остальные районы области\n"
+        f"📞 {sh}\n📱 {mn}\n📱 {n1}\n📱 {n2}"
+    )
+    TEXTS["uz"]["branches_text"] = (
+        f"📍 *Filiallarimiz*\n\n"
+        f"🏢 *Zarafshon filiali*\nXizmat ko'rsatadi: Zarafshon, Uchquduq, Tomdi tumani\n"
+        f"📞 {sh}\n📱 {mn}\n📱 {z1}\n📱 {z2}\n\n"
+        f"🏢 *Navoiy filiali*\nXizmat ko'rsatadi: Navoiy va viloyatning boshqa tumanlari\n"
+        f"📞 {sh}\n📱 {mn}\n📱 {n1}\n📱 {n2}"
+    )
+    # Telegram и Instagram кнопки обновляются через promo_kb — ссылки в SITE
 
 bot = Bot(token=BOT_TOKEN)
 dp  = Dispatcher(storage=MemoryStorage())
@@ -700,8 +790,8 @@ async def menu_branches(cb: CallbackQuery):
 
 def promo_kb(uid):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=t(uid,"btn_promo_telegram"),  url="https://t.me/artez_gilam_yuvish")],
-        [InlineKeyboardButton(text=t(uid,"btn_promo_instagram"), url="https://www.instagram.com/ziyoboboev/")],
+        [InlineKeyboardButton(text=t(uid,"btn_promo_telegram"),  url=SITE["social_tg_group"])],
+        [InlineKeyboardButton(text=t(uid,"btn_promo_instagram"), url=SITE["social_instagram"])],
         [InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")],
     ])
 
@@ -1546,6 +1636,7 @@ async def main():
     await init_db()
     await load_prices()
     await load_units()
+    await load_site_settings()
     logging.info("✅ Bot started, polling...")
     await dp.start_polling(bot)
 
