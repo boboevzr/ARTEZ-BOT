@@ -544,3 +544,31 @@ async def set_client_lang(tg_id: int, lang: str):
             "UPDATE clients SET lang=$1, updated_at=NOW() WHERE tg_id=$2",
             lang, tg_id
         )
+
+
+# ══════════════════════════════════════
+#  CRM SYNC (shared crm_clients table)
+# ══════════════════════════════════════
+async def upsert_crm_client(phone: str, first_name: str = "", last_name: str = "",
+                             tg_id: int = None, tg_username: str = None,
+                             source: str = "bot"):
+    """Синхронизирует клиента в общую CRM-таблицу crm_clients."""
+    if not pool or not phone:
+        return
+    try:
+        async with pool.acquire() as conn:
+            await conn.execute("""
+                INSERT INTO crm_clients (phone, first_name, last_name, tg_id, tg_username, source)
+                VALUES ($1, $2, $3, $4, $5, $6)
+                ON CONFLICT (phone) DO UPDATE SET
+                    first_name  = CASE WHEN $2 != '' THEN $2 ELSE crm_clients.first_name END,
+                    last_name   = CASE WHEN $3 != '' THEN $3 ELSE crm_clients.last_name END,
+                    tg_id       = COALESCE($4, crm_clients.tg_id),
+                    tg_username = CASE WHEN $5 IS NOT NULL AND $5 != ''
+                                       THEN $5 ELSE crm_clients.tg_username END,
+                    orders_count = (SELECT COUNT(*) FROM orders WHERE client_phone = $1),
+                    last_order_at = NOW(),
+                    updated_at  = NOW()
+            """, phone, first_name or "", last_name or "", tg_id, tg_username, source)
+    except Exception as e:
+        logging.warning(f"upsert_crm_client error: {e}")

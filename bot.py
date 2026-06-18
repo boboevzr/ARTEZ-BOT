@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client
 
 logging.basicConfig(level=logging.INFO)
 
@@ -151,6 +151,7 @@ T = {
         "btn_status":     "📦 Статус заказа",
         "btn_operator":   "👨‍💼 Оператор",
         "btn_info":       "ℹ️ О компании",
+        "btn_profile":    "👤 Мой профиль",
         "btn_help":       "🆘 Помощь",
         "btn_settings":   "⚙️ Настройки",
         "btn_change_lang": "🌐 Сменить язык",
@@ -241,6 +242,7 @@ T = {
         "btn_status":     "📦 Buyurtma holati",
         "btn_operator":   "👨‍💼 Operator",
         "btn_info":       "ℹ️ Kompaniya haqida",
+        "btn_profile":    "👤 Mening profilim",
         "btn_help":       "🆘 Yordam",
         "btn_settings":   "⚙️ Sozlamalar",
         "btn_change_lang": "🌐 Tilni o'zgartirish",
@@ -570,7 +572,6 @@ def lang_kb():
     ]])
 
 def menu_kb(uid):
-    l = lang(uid)
     rows = [
         [InlineKeyboardButton(text=t(uid,"btn_webapp"), web_app=WebAppInfo(url=WEBSITE_URL))],
         [InlineKeyboardButton(text=t(uid,"btn_order"),    callback_data="menu_order"),
@@ -581,6 +582,7 @@ def menu_kb(uid):
          InlineKeyboardButton(text=t(uid,"btn_status"),   callback_data="menu_status")],
         [InlineKeyboardButton(text=t(uid,"btn_operator"), callback_data="menu_operator"),
          InlineKeyboardButton(text=t(uid,"btn_info"),     callback_data="menu_info")],
+        [InlineKeyboardButton(text=t(uid,"btn_profile"),  callback_data="menu_profile")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -903,6 +905,34 @@ async def show_status_group(cb: CallbackQuery):
 
 
 # ── ОПЕРАТОР ──
+@dp.callback_query(F.data == "menu_profile")
+async def menu_profile(cb: CallbackQuery):
+    uid = cb.from_user.id
+    try:
+        orders = await get_client_orders(uid)
+        total  = len(orders)
+        done   = sum(1 for o in orders if o.get("status") in ("done","completed"))
+        last_d = ""
+        if orders:
+            ts = orders[0].get("created_at")
+            if ts:
+                last_d = ts.strftime("%d.%m.%Y") if hasattr(ts,"strftime") else str(ts)[:10]
+        name_parts = [cb.from_user.first_name or "", cb.from_user.last_name or ""]
+        name = " ".join(p for p in name_parts if p) or "—"
+        status_ru = {"new":"Новый клиент","active":"Активный","vip":"VIP ⭐","inactive":"Неактивный"}
+        text = (
+            f"👤 *Ваш профиль*\n\n"
+            f"📛 {name}\n"
+            f"🆔 {uid}\n"
+            f"📊 Заявок всего: *{total}*\n"
+            f"✅ Выполнено: *{done}*\n"
+            + (f"📅 Последняя заявка: {last_d}\n" if last_d else "")
+        )
+    except Exception as e:
+        logging.warning(f"menu_profile error: {e}")
+        text = "👤 *Ваш профиль*\n\nДанные загружаются…"
+    await cb.message.answer(text, reply_markup=back_kb(uid), parse_mode="Markdown")
+
 @dp.callback_query(F.data == "menu_operator")
 async def menu_operator(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
@@ -1249,12 +1279,18 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         "note":               f"Тип услуги: {d.get('service_type','')}",
     })
 
-    # Обновляем клиента в БД
+    # Обновляем клиента в боте
     await upsert_client(
         tg_id=uid, username=username,
         first_name=first_name, last_name=last_name,
         phone=d.get("phone",""), lang=lang(uid)
     )
+    # Синхронизируем в CRM
+    if d.get("phone",""):
+        await upsert_crm_client(
+            phone=d["phone"], first_name=first_name, last_name=last_name,
+            tg_id=uid, tg_username=username, source="bot"
+        )
 
     # Уведомление клиенту
     await answer_fn(
