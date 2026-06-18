@@ -364,6 +364,12 @@ async def get_orders_by_status(status: str, branch: str = None):
         )
 
 
+async def get_client_by_tg_id(tg_id: int) -> dict | None:
+    if not pool: return None
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT * FROM clients WHERE tg_id=$1", tg_id)
+        return dict(row) if row else None
+
 async def get_client_orders(tg_id: int):
     if not pool: return []
     async with pool.acquire() as conn:

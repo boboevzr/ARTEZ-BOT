@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id
 
 logging.basicConfig(level=logging.INFO)
 
@@ -152,6 +152,12 @@ T = {
         "btn_operator":   "👨‍💼 Оператор",
         "btn_info":       "ℹ️ О компании",
         "btn_profile":    "👤 Мой профиль",
+        "profile_text":   "👤 *Ваш профиль*\n\n📛 Имя: {name}\n📞 Телефон: {phone}\n🆔 ID: {uid}\n\n📊 Заявок всего: *{total}*\n✅ Выполнено: *{done}*\n{last}",
+        "profile_last":   "📅 Последняя заявка: {date}\n",
+        "profile_nophone":"Не указан",
+        "btn_use_saved_phone": "✅ Использовать {phone}",
+        "btn_enter_other_phone": "⌨️ Ввести другой номер",
+        "ask_phone_saved":"Шаг 2 из 7\n📞 Использовать сохранённый номер?",
         "btn_help":       "🆘 Помощь",
         "btn_settings":   "⚙️ Настройки",
         "btn_change_lang": "🌐 Сменить язык",
@@ -243,6 +249,12 @@ T = {
         "btn_operator":   "👨‍💼 Operator",
         "btn_info":       "ℹ️ Kompaniya haqida",
         "btn_profile":    "👤 Mening profilim",
+        "profile_text":   "👤 *Profilingiz*\n\n📛 Ism: {name}\n📞 Telefon: {phone}\n🆔 ID: {uid}\n\n📊 Jami buyurtmalar: *{total}*\n✅ Bajarildi: *{done}*\n{last}",
+        "profile_last":   "📅 Oxirgi buyurtma: {date}\n",
+        "profile_nophone":"Ko'rsatilmagan",
+        "btn_use_saved_phone": "✅ {phone} dan foydalanish",
+        "btn_enter_other_phone": "⌨️ Boshqa raqam kiritish",
+        "ask_phone_saved":"2-qadam (7 dan)\n📞 Saqlangan raqamdan foydalanasizmi?",
         "btn_help":       "🆘 Yordam",
         "btn_settings":   "⚙️ Sozlamalar",
         "btn_change_lang": "🌐 Tilni o'zgartirish",
@@ -909,6 +921,7 @@ async def show_status_group(cb: CallbackQuery):
 async def menu_profile(cb: CallbackQuery):
     uid = cb.from_user.id
     try:
+        client = await get_client_by_tg_id(uid)
         orders = await get_client_orders(uid)
         total  = len(orders)
         done   = sum(1 for o in orders if o.get("status") in ("done","completed"))
@@ -916,21 +929,18 @@ async def menu_profile(cb: CallbackQuery):
         if orders:
             ts = orders[0].get("created_at")
             if ts:
-                last_d = ts.strftime("%d.%m.%Y") if hasattr(ts,"strftime") else str(ts)[:10]
+                last_d = ts.strftime("%d.%m.%Y") if hasattr(ts, "strftime") else str(ts)[:10]
         name_parts = [cb.from_user.first_name or "", cb.from_user.last_name or ""]
-        name = " ".join(p for p in name_parts if p) or "—"
-        status_ru = {"new":"Новый клиент","active":"Активный","vip":"VIP ⭐","inactive":"Неактивный"}
-        text = (
-            f"👤 *Ваш профиль*\n\n"
-            f"📛 {name}\n"
-            f"🆔 {uid}\n"
-            f"📊 Заявок всего: *{total}*\n"
-            f"✅ Выполнено: *{done}*\n"
-            + (f"📅 Последняя заявка: {last_d}\n" if last_d else "")
+        name  = " ".join(p for p in name_parts if p) or "—"
+        phone = (client or {}).get("phone") or t(uid, "profile_nophone")
+        last_line = t(uid, "profile_last").format(date=last_d) if last_d else ""
+        text = t(uid, "profile_text").format(
+            name=name, phone=phone, uid=uid,
+            total=total, done=done, last=last_line
         )
     except Exception as e:
         logging.warning(f"menu_profile error: {e}")
-        text = "👤 *Ваш профиль*\n\nДанные загружаются…"
+        text = t(uid, "profile_text").format(name="—", phone="—", uid=uid, total=0, done=0, last="")
     await cb.message.answer(text, reply_markup=back_kb(uid), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "menu_operator")
@@ -1034,11 +1044,49 @@ async def order_name(msg: Message, state: FSMContext):
     uid = msg.from_user.id
     user_data_db[uid]["name"] = msg.text
     await state.set_state(OrderForm.phone)
-    await msg.answer(
-        t(uid,"ask_phone"),
-        reply_markup=phone_kb(uid),
-        parse_mode="Markdown"
-    )
+    # Проверяем: есть ли сохранённый номер у клиента
+    try:
+        client = await get_client_by_tg_id(uid)
+        saved_phone = (client or {}).get("phone") or ""
+    except Exception:
+        saved_phone = ""
+    if saved_phone:
+        user_data_db[uid]["_saved_phone"] = saved_phone
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text=t(uid, "btn_use_saved_phone").format(phone=saved_phone),
+                callback_data="phone_use_saved"
+            ),
+            InlineKeyboardButton(
+                text=t(uid, "btn_enter_other_phone"),
+                callback_data="phone_enter_other"
+            ),
+        ]])
+        await msg.answer(t(uid, "ask_phone_saved"), reply_markup=kb, parse_mode="Markdown")
+    else:
+        await msg.answer(t(uid, "ask_phone"), reply_markup=phone_kb(uid), parse_mode="Markdown")
+
+# Клиент выбрал «Использовать сохранённый номер»
+@dp.callback_query(OrderForm.phone, F.data == "phone_use_saved")
+async def order_phone_use_saved(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    phone = user_data_db[uid].get("_saved_phone", "")
+    if not phone:
+        await cb.answer()
+        await cb.message.answer(t(uid, "ask_phone"), reply_markup=phone_kb(uid), parse_mode="Markdown")
+        return
+    user_data_db[uid]["phone"] = phone
+    await cb.message.edit_reply_markup(reply_markup=None)
+    await state.set_state(OrderForm.branch)
+    await cb.message.answer(f"✅ {phone}")
+    await cb.message.answer(t(uid, "ask_branch"), reply_markup=branch_kb(uid))
+
+# Клиент выбрал «Ввести другой номер» из inline-меню
+@dp.callback_query(OrderForm.phone, F.data == "phone_enter_other")
+async def order_phone_enter_other(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.message.edit_reply_markup(reply_markup=None)
+    await cb.message.answer(t(uid, "ask_phone"), reply_markup=phone_kb(uid), parse_mode="Markdown")
 
 # Клиент нажал «Поделиться номером» — Telegram прислал contact
 @dp.message(OrderForm.phone, F.contact)
