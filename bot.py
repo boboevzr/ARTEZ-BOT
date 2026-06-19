@@ -611,6 +611,7 @@ def menu_kb(uid):
         [InlineKeyboardButton(text=t(uid,"btn_operator"), callback_data="menu_operator"),
          InlineKeyboardButton(text=t(uid,"btn_info"),     callback_data="menu_info")],
         [InlineKeyboardButton(text=t(uid,"btn_profile"),  callback_data="menu_profile")],
+        [InlineKeyboardButton(text="🤝 Стать Агентом",   callback_data="menu_agent")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -865,6 +866,72 @@ async def menu_settings(cb: CallbackQuery):
 async def settings_lang(cb: CallbackQuery):
     uid = cb.from_user.id
     await cb.message.answer(t(uid,"choose_lang_text"), reply_markup=lang_kb())
+
+# ── АГЕНТ ─────────────────────────────────────────────────────────────
+@dp.callback_query(F.data == "menu_agent")
+async def menu_agent(cb: CallbackQuery):
+    uid = cb.from_user.id
+    # Проверяем: есть ли пользователь сайта с этим tg_id
+    import aiohttp as _aiohttp
+    API = os.getenv("WEBSITE_API", "https://artez-api.railway.app/api")
+    try:
+        async with _aiohttp.ClientSession() as s:
+            r = await s.get(f"{API}/agent/status-by-tg/{uid}", timeout=_aiohttp.ClientTimeout(total=5))
+            data = await r.json()
+    except Exception:
+        data = {}
+
+    if data.get("is_agent"):
+        text = ("✅ *Вы уже являетесь Агентом ARTEZ*\n\n"
+                "Войдите в систему для работы с лидами:\n"
+                "🔗 staff.artez.uz\n\n"
+                "Логин: ваш номер телефона\n\n"
+                "_Забыли пароль? Нажмите кнопку ниже_")
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🔑 Сбросить пароль", callback_data="agent_reset_pass")],
+            [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
+        ])
+    elif data.get("has_site_account"):
+        text = ("🤝 *Стать Агентом ARTEZ*\n\n"
+                "Приводите клиентов — получайте вознаграждение за каждый заказ.\n\n"
+                "Для регистрации перейдите на сайт в раздел *Стать Агентом*:")
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🌐 Зарегистрироваться на сайте",
+                                  url=f"{os.getenv('WEBSITE_URL','https://artez.uz')}#agent")],
+            [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
+        ])
+    else:
+        text = ("🤝 *Стать Агентом ARTEZ*\n\n"
+                "Приводите клиентов и зарабатывайте!\n\n"
+                "⚠️ *Для регистрации нужно:*\n"
+                "1. Зарегистрироваться на сайте artez.uz\n"
+                "2. Вернуться сюда и нажать «Стать Агентом»\n\n"
+                "После регистрации на сайте откроется форма.")
+        kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🌐 Зарегистрироваться на сайте",
+                                  url=os.getenv('WEBSITE_URL','https://artez.uz'))],
+            [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
+        ])
+    await cb.message.answer(text, reply_markup=kb, parse_mode="Markdown")
+    await cb.answer()
+
+@dp.callback_query(F.data == "agent_reset_pass")
+async def agent_reset_pass(cb: CallbackQuery):
+    uid = cb.from_user.id
+    API = os.getenv("WEBSITE_API", "https://artez-api.railway.app/api")
+    try:
+        async with aiohttp.ClientSession() as s:
+            r = await s.post(f"{API}/agent/reset-password-by-tg",
+                             json={"tg_id": uid},
+                             timeout=aiohttp.ClientTimeout(total=8))
+            data = await r.json()
+        if data.get("ok"):
+            await cb.message.answer("🔑 Временный пароль отправлен выше.\n⏰ Действует 10 минут.\nПосле входа сразу смените пароль.")
+        else:
+            await cb.message.answer("❌ Ошибка: " + data.get("detail",""))
+    except Exception as e:
+        await cb.message.answer(f"❌ Ошибка соединения: {e}")
+    await cb.answer()
 
 def status_menu_kb(uid, counts):
     return InlineKeyboardMarkup(inline_keyboard=[
