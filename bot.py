@@ -21,8 +21,10 @@ logging.basicConfig(level=logging.INFO)
 
 BOT_TOKEN   = os.getenv("BOT_TOKEN", "8871514482:AAGEqOUDPoAeCyyu8gvGa0ZkKRgqV28Yo5A")
 ADMIN_ID    = int(os.getenv("ADMIN_ID") or "624826036")       # ваш личный ID (для сообщений от оператора)
-GROUP_ID    = int(os.getenv("GROUP_ID") or "-5211502458")      # группа сотрудников (заявки)
-GROUP_SMS_ID = int(os.getenv("GROUP_SMS_ID") or "-5303335722")  # группа сообщений от клиентов
+GROUP_ID           = int(os.getenv("GROUP_ID") or "-5211502458")      # группа сотрудников (заявки)
+GROUP_ID_ZARAFSHAN = int(os.getenv("GROUP_ID_ZARAFSHAN") or "0")        # группа Зарафшан
+GROUP_ID_NAVOI     = int(os.getenv("GROUP_ID_NAVOI") or "0")            # группа Навои
+GROUP_SMS_ID       = int(os.getenv("GROUP_SMS_ID") or "-5303335722")    # группа сообщений от клиентов
 SHEETS_URL  = os.getenv("SHEETS_URL", "https://script.google.com/macros/s/AKfycbyU5a3pMuTFme3dBNEgu46qzA1sN1Ekw-Q7p39F1Pg872lnnXZEFhJPjuc4TzZNHlpObQ/exec")
 WEBSITE_URL = os.getenv("WEBSITE_URL", "https://artez.uz")
 API_URL     = os.getenv("API_URL", "https://artez-api-production.up.railway.app/api")
@@ -713,7 +715,15 @@ async def send_to_sheets(data: dict):
     except Exception as e:
         logging.warning(f"Sheets error: {e}")
 
-async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None, username: str = None, location_url: str = None):
+def _group_id_for_branch(branch: str) -> int:
+    """Возвращает chat_id группы по филиалу. Fallback — общий GROUP_ID."""
+    if branch == "zarafshan" and GROUP_ID_ZARAFSHAN:
+        return GROUP_ID_ZARAFSHAN
+    if branch == "navoi" and GROUP_ID_NAVOI:
+        return GROUP_ID_NAVOI
+    return GROUP_ID
+
+async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None, username: str = None, location_url: str = None, branch: str = ""):
     """Отправляет заявку в группу сотрудников с кнопками действий"""
     kb_rows = []
     if location_url:
@@ -734,8 +744,9 @@ async def notify_group(text: str, order_num: int = None, client_id: int = None, 
             ],
         ])
     kb = InlineKeyboardMarkup(inline_keyboard=kb_rows) if kb_rows else None
+    target_group = _group_id_for_branch(branch)
     try:
-        await bot.send_message(GROUP_ID, text, reply_markup=kb)
+        await bot.send_message(target_group, text, reply_markup=kb)
     except Exception as e:
         logging.warning(f"Group notify error: {e}")
         # Если не получилось в группу — отправляем лично
@@ -1390,7 +1401,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
     )
     raw_phone = (d.get("phone","") or "").strip()
     client_phone = re.sub(r"[\s\-]", "", raw_phone)
-    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone, username=username, location_url=location_url)
+    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone, username=username, location_url=location_url, branch=d.get("branch",""))
 
     # В Google Таблицу
     await send_to_sheets({
