@@ -947,9 +947,9 @@ async def _do_agent_check(uid: int, phone: str | None, answer_fn):
 
     # Аккаунт на сайте не найден — просим поделиться НАСТОЯЩИМ номером
     await answer_fn(
-        "🤝 *Стать Агентом ARTEZ*\n\n"
-        "Аккаунт на сайте не найден\\.\n\n"
-        "Нажмите кнопку ниже — бот получит ваш реальный номер Telegram и найдёт ваш аккаунт на artez\\.uz",
+        "🤝 Стать Агентом ARTEZ\n\n"
+        "Аккаунт на сайте не найден.\n\n"
+        "Нажмите кнопку ниже — бот получит ваш реальный номер Telegram и найдёт ваш аккаунт на artez.uz",
         ReplyKeyboardMarkup(keyboard=[
             [KeyboardButton(text="📱 Поделиться номером", request_contact=True)],
         ], resize_keyboard=True, one_time_keyboard=True),
