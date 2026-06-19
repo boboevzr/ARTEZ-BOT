@@ -463,16 +463,30 @@ STATUS_GROUPS = {
 }
 
 ORDER_STATUS_NAMES_RU = {
-    "new": "🆕 Новый", "confirmed": "✅ Подтверждён",
-    "pickup": "🚗 Вывоз", "received": "📥 Принят в мастерскую", "washing": "🧼 В чистке",
-    "packing": "📦 Упаковка", "ready": "✅ Готов", "delivery": "🚚 Доставка",
-    "delivered": "✅ Доставлен", "cancelled": "❌ Отменён",
+    "new":       "🆕 Новый",
+    "confirmed": "✅ Подтверждён",
+    "pickup":    "🚗 Вывоз",
+    "received":  "📥 В мастерской",
+    "washing":   "🧼 Мойка",
+    "drying":    "💨 Сушка",
+    "packing":   "📦 Упаковка",
+    "ready":     "✅ Готов",
+    "delivery":  "🚚 Доставка",
+    "delivered": "✅ Доставлен",
+    "cancelled": "❌ Отменён",
 }
 ORDER_STATUS_NAMES_UZ = {
-    "new": "🆕 Yangi", "confirmed": "✅ Tasdiqlangan",
-    "pickup": "🚗 Olib ketish", "received": "📥 Ustaxonaga qabul qilindi", "washing": "🧼 Tozalanmoqda",
-    "packing": "📦 Qadoqlash", "ready": "✅ Tayyor", "delivery": "🚚 Yetkazish",
-    "delivered": "✅ Yetkazildi", "cancelled": "❌ Bekor qilindi",
+    "new":       "🆕 Yangi",
+    "confirmed": "✅ Tasdiqlangan",
+    "pickup":    "🚗 Olib ketish",
+    "received":  "📥 Ustaxonada",
+    "washing":   "🧼 Yuvish",
+    "drying":    "💨 Quritish",
+    "packing":   "📦 Qadoqlash",
+    "ready":     "✅ Tayyor",
+    "delivery":  "🚚 Yetkazish",
+    "delivered": "✅ Yetkazildi",
+    "cancelled": "❌ Bekor qilindi",
 }
 
 def order_status_name(uid, status):

@@ -83,8 +83,9 @@ async def create_tables():
                                     'new',        -- Новый
                                     'confirmed',  -- Подтверждён
                                     'pickup',     -- Вывоз
-                                    'received',   -- Принят на мастерскую
-                                    'washing',    -- В чистке
+                                    'received',   -- В мастерской
+                                    'washing',    -- Мойка
+                                    'drying',     -- Сушка
                                     'packing',    -- Упаковка
                                     'ready',      -- Готов
                                     'delivery',   -- Доставка
@@ -171,6 +172,20 @@ async def create_tables():
         -- Добавляем новые колонки если их нет (для существующих таблиц)
         ALTER TABLE prices ADD COLUMN IF NOT EXISTS unit_key VARCHAR(20) DEFAULT 'm2';
         ALTER TABLE prices ADD COLUMN IF NOT EXISTS min_order NUMERIC(10,2) DEFAULT NULL;
+
+        -- Снять старый CHECK на status (чтобы добавить drying)
+        DO $$ DECLARE r RECORD;
+        BEGIN
+          FOR r IN SELECT conname FROM pg_constraint
+                   WHERE conrelid='orders'::regclass AND contype='c' AND conname LIKE '%status%'
+          LOOP EXECUTE format('ALTER TABLE orders DROP CONSTRAINT %I', r.conname);
+          END LOOP;
+        END $$;
+        -- Добавить CHECK со всеми статусами включая drying
+        ALTER TABLE orders DROP CONSTRAINT IF EXISTS orders_status_check;
+        ALTER TABLE orders ADD CONSTRAINT orders_status_check CHECK (status IN (
+          'new','confirmed','pickup','received','washing','drying','packing','ready','delivery','delivered','cancelled'
+        ));
 
         -- Индексы
         CREATE INDEX IF NOT EXISTS idx_orders_client   ON orders(client_tg_id);
