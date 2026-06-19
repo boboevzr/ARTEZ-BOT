@@ -895,49 +895,83 @@ async def settings_lang(cb: CallbackQuery):
 @dp.callback_query(F.data == "menu_agent")
 async def menu_agent(cb: CallbackQuery):
     uid = cb.from_user.id
-    # Проверяем: есть ли пользователь сайта с этим tg_id
-    import aiohttp as _aiohttp
-    API = os.getenv("WEBSITE_API", "https://artez-api.railway.app/api")
+    await cb.answer()
+    await cb.message.answer("⏳ Проверяем…")
+
     try:
-        async with _aiohttp.ClientSession() as s:
-            r = await s.get(f"{API}/agent/status-by-tg/{uid}", timeout=_aiohttp.ClientTimeout(total=5))
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(f"{API_URL}/agent/status-by-tg/{uid}",
+                            timeout=aiohttp.ClientTimeout(total=6))
             data = await r.json()
     except Exception:
         data = {}
 
     if data.get("is_agent"):
-        text = ("✅ *Вы уже являетесь Агентом ARTEZ*\n\n"
-                "Войдите в систему для работы с лидами:\n"
-                "🔗 artez.uz/staff.html\n\n"
-                "Логин: ваш номер телефона\n\n"
+        # Уже агент
+        text = ("✅ *Вы уже являетесь Агентом ARTEZ\\!*\n\n"
+                "Войдите в кабинет агента:\n"
+                "🔗 artez\\.uz/staff\\.html\n\n"
+                "Логин: ваш номер телефона\n"
                 "_Забыли пароль? Нажмите кнопку ниже_")
         kb = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🎯 Открыть кабинет агента",
+                                  url="https://artez.uz/staff.html")],
             [InlineKeyboardButton(text="🔑 Сбросить пароль", callback_data="agent_reset_pass")],
             [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
         ])
+        await cb.message.answer(text, reply_markup=kb, parse_mode="MarkdownV2")
+
     elif data.get("has_site_account"):
-        text = ("🤝 *Стать Агентом ARTEZ*\n\n"
-                "Приводите клиентов — получайте вознаграждение за каждый заказ.\n\n"
-                "Для регистрации перейдите на сайт в раздел *Стать Агентом*:")
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🌐 Зарегистрироваться на сайте",
-                                  url=f"{os.getenv('WEBSITE_URL','https://artez.uz')}#agent")],
-            [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
-        ])
+        # Есть аккаунт на сайте — регистрируем прямо сейчас
+        try:
+            async with aiohttp.ClientSession() as s:
+                r = await s.post(f"{API_URL}/agent/apply-by-tg",
+                                 json={"tg_id": uid},
+                                 timeout=aiohttp.ClientTimeout(total=8))
+                result = await r.json()
+        except Exception:
+            result = {}
+
+        if result.get("ok"):
+            phone = result.get("phone", "")
+            already = result.get("already", False)
+            if already:
+                text = ("✅ *Вы уже являетесь Агентом ARTEZ\\!*\n\n"
+                        f"Логин: `{phone}`\n"
+                        "Пароль: как на сайте artez\\.uz\n\n"
+                        "🔗 artez\\.uz/staff\\.html")
+            else:
+                text = ("🎉 *Ура\\! Вы стали Агентом ARTEZ\\!*\n\n"
+                        f"Логин: `{phone}`\n"
+                        "Пароль: как на сайте artez\\.uz\n\n"
+                        "Войдите в кабинет агента:\n"
+                        "🔗 artez\\.uz/staff\\.html")
+            kb = InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎯 Открыть кабинет агента",
+                                      url="https://artez.uz/staff.html")],
+                [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
+            ])
+            await cb.message.answer(text, reply_markup=kb, parse_mode="MarkdownV2")
+        else:
+            await cb.message.answer(
+                "❌ Не удалось зарегистрировать. Попробуйте через сайт artez.uz",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="← Назад", callback_data="go_menu")]
+                ])
+            )
     else:
+        # Нет аккаунта на сайте
         text = ("🤝 *Стать Агентом ARTEZ*\n\n"
-                "Приводите клиентов и зарабатывайте!\n\n"
+                "Приводите клиентов и зарабатывайте\\!\n\n"
                 "⚠️ *Для регистрации нужно:*\n"
-                "1. Зарегистрироваться на сайте artez.uz\n"
-                "2. Вернуться сюда и нажать «Стать Агентом»\n\n"
-                "После регистрации на сайте откроется форма.")
+                "1\\. Зарегистрироваться на сайте artez\\.uz\n"
+                "2\\. Вернуться сюда и нажать «Стать Агентом»")
         kb = InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🌐 Зарегистрироваться на сайте",
-                                  url=os.getenv('WEBSITE_URL','https://artez.uz'))],
+                                  url=os.getenv("WEBSITE_URL", "https://artez.uz"))],
             [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
         ])
-    await cb.message.answer(text, reply_markup=kb, parse_mode="Markdown")
-    await cb.answer()
+        await cb.message.answer(text, reply_markup=kb, parse_mode="MarkdownV2")
 
 @dp.callback_query(F.data == "agent_reset_pass")
 async def agent_reset_pass(cb: CallbackQuery):
