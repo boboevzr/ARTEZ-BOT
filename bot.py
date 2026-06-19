@@ -884,7 +884,7 @@ async def menu_agent(cb: CallbackQuery):
     if data.get("is_agent"):
         text = ("✅ *Вы уже являетесь Агентом ARTEZ*\n\n"
                 "Войдите в систему для работы с лидами:\n"
-                "🔗 staff.artez.uz\n\n"
+                "🔗 artez.uz/staff.html\n\n"
                 "Логин: ваш номер телефона\n\n"
                 "_Забыли пароль? Нажмите кнопку ниже_")
         kb = InlineKeyboardMarkup(inline_keyboard=[
