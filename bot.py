@@ -590,6 +590,9 @@ class OperatorForm(StatesGroup):
 class AdminReply(StatesGroup):
     waiting_reply = State()   # оператор пишет ответ клиенту
 
+class AgentForm(StatesGroup):
+    waiting_contact = State()  # ожидаем контакт для регистрации агента
+
 # ══════════════════════════════════════
 #  КЛАВИАТУРЫ
 # ══════════════════════════════════════
@@ -892,91 +895,104 @@ async def settings_lang(cb: CallbackQuery):
     await cb.message.answer(t(uid,"choose_lang_text"), reply_markup=lang_kb())
 
 # ── АГЕНТ ─────────────────────────────────────────────────────────────
-@dp.callback_query(F.data == "menu_agent")
-async def menu_agent(cb: CallbackQuery):
-    uid = cb.from_user.id
-    await cb.answer()
-    await cb.message.answer("⏳ Проверяем…")
-
-    # Телефон из базы бота (если пользователь его оставлял)
-    bot_client = await get_client_by_tg_id(uid)
-    bot_phone = bot_client.get("phone") if bot_client else None
-
+async def _do_agent_check(uid: int, phone: str | None, answer_fn):
+    """Общая логика проверки/регистрации агента. answer_fn(text, kb, parse_mode)."""
     try:
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{API_URL}/agent/status-by-tg/{uid}",
-                            params={"phone": bot_phone} if bot_phone else {},
+                            params={"phone": phone} if phone else {},
                             timeout=aiohttp.ClientTimeout(total=6))
             data = await r.json()
     except Exception:
         data = {}
 
     if data.get("is_agent"):
-        # Уже агент
-        text = ("✅ *Вы уже являетесь Агентом ARTEZ\\!*\n\n"
-                "Войдите в кабинет агента:\n"
-                "🔗 artez\\.uz/staff\\.html\n\n"
-                "Логин: ваш номер телефона\n"
-                "_Забыли пароль? Нажмите кнопку ниже_")
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🎯 Открыть кабинет агента",
-                                  url="https://artez.uz/staff.html")],
-            [InlineKeyboardButton(text="🔑 Сбросить пароль", callback_data="agent_reset_pass")],
-            [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
-        ])
-        await cb.message.answer(text, reply_markup=kb, parse_mode="MarkdownV2")
+        await answer_fn(
+            "✅ *Вы уже являетесь Агентом ARTEZ\\!*\n\n"
+            "Войдите в кабинет агента:\n🔗 artez\\.uz/staff\\.html\n\n"
+            "Логин: ваш номер телефона\n_Забыли пароль? Нажмите кнопку ниже_",
+            InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎯 Открыть кабинет агента", url="https://artez.uz/staff.html")],
+                [InlineKeyboardButton(text="🔑 Сбросить пароль", callback_data="agent_reset_pass")],
+                [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
+            ]), "MarkdownV2")
+        return
 
-    elif data.get("has_site_account"):
-        # Есть аккаунт на сайте — регистрируем прямо сейчас
+    if data.get("has_site_account"):
+        # Регистрируем
         try:
             async with aiohttp.ClientSession() as s:
                 r = await s.post(f"{API_URL}/agent/apply-by-tg",
-                                 json={"tg_id": uid, "phone": bot_phone},
+                                 json={"tg_id": uid, "phone": phone},
                                  timeout=aiohttp.ClientTimeout(total=8))
                 result = await r.json()
         except Exception:
             result = {}
 
         if result.get("ok"):
-            phone = result.get("phone", "")
+            p = result.get("phone", "")
             already = result.get("already", False)
-            if already:
-                text = ("✅ *Вы уже являетесь Агентом ARTEZ\\!*\n\n"
-                        f"Логин: `{phone}`\n"
-                        "Пароль: как на сайте artez\\.uz\n\n"
-                        "🔗 artez\\.uz/staff\\.html")
-            else:
-                text = ("🎉 *Ура\\! Вы стали Агентом ARTEZ\\!*\n\n"
-                        f"Логин: `{phone}`\n"
-                        "Пароль: как на сайте artez\\.uz\n\n"
-                        "Войдите в кабинет агента:\n"
-                        "🔗 artez\\.uz/staff\\.html")
-            kb = InlineKeyboardMarkup(inline_keyboard=[
-                [InlineKeyboardButton(text="🎯 Открыть кабинет агента",
-                                      url="https://artez.uz/staff.html")],
+            txt = (f"✅ *Вы уже являетесь Агентом ARTEZ\\!*\n\nЛогин: `{p}`\nПароль: как на сайте artez\\.uz\n\n🔗 artez\\.uz/staff\\.html"
+                   if already else
+                   f"🎉 *Ура\\! Вы стали Агентом ARTEZ\\!*\n\nЛогин: `{p}`\nПароль: как на сайте artez\\.uz\n\nВойдите в кабинет:\n🔗 artez\\.uz/staff\\.html")
+            await answer_fn(txt, InlineKeyboardMarkup(inline_keyboard=[
+                [InlineKeyboardButton(text="🎯 Открыть кабинет агента", url="https://artez.uz/staff.html")],
                 [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
-            ])
-            await cb.message.answer(text, reply_markup=kb, parse_mode="MarkdownV2")
+            ]), "MarkdownV2")
         else:
-            await cb.message.answer(
-                "❌ Не удалось зарегистрировать. Попробуйте через сайт artez.uz",
-                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
-                    [InlineKeyboardButton(text="← Назад", callback_data="go_menu")]
-                ])
-            )
-    else:
-        # Нет аккаунта на сайте
-        text = ("🤝 *Стать Агентом ARTEZ*\n\n"
-                "Приводите клиентов и зарабатывайте\\!\n\n"
-                "⚠️ *Для регистрации нужно:*\n"
-                "1\\. Зарегистрироваться на сайте artez\\.uz\n"
-                "2\\. Вернуться сюда и нажать «Стать Агентом»")
-        kb = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🌐 Зарегистрироваться на сайте",
-                                  url=os.getenv("WEBSITE_URL", "https://artez.uz"))],
-            [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
-        ])
-        await cb.message.answer(text, reply_markup=kb, parse_mode="MarkdownV2")
+            await answer_fn("❌ Не удалось зарегистрировать\\. Попробуйте через сайт artez\\.uz",
+                            InlineKeyboardMarkup(inline_keyboard=[[InlineKeyboardButton(text="← Назад", callback_data="go_menu")]]),
+                            "MarkdownV2")
+        return
+
+    # Аккаунт на сайте не найден — просим поделиться НАСТОЯЩИМ номером
+    await answer_fn(
+        "🤝 *Стать Агентом ARTEZ*\n\n"
+        "Аккаунт на сайте не найден\\.\n\n"
+        "Нажмите кнопку ниже — бот получит ваш реальный номер Telegram и найдёт ваш аккаунт на artez\\.uz",
+        ReplyKeyboardMarkup(keyboard=[
+            [KeyboardButton(text="📱 Поделиться номером", request_contact=True)],
+        ], resize_keyboard=True, one_time_keyboard=True),
+        None)
+
+@dp.callback_query(F.data == "menu_agent")
+async def menu_agent(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.answer()
+    await cb.message.answer("⏳ Проверяем…")
+
+    bot_client = await get_client_by_tg_id(uid)
+    bot_phone = bot_client.get("phone") if bot_client else None
+
+    async def reply(text, kb, pm):
+        if pm:
+            await cb.message.answer(text, reply_markup=kb, parse_mode=pm)
+        else:
+            await cb.message.answer(text, reply_markup=kb)
+            await state.set_state(AgentForm.waiting_contact)
+
+    await _do_agent_check(uid, bot_phone, reply)
+
+@dp.message(AgentForm.waiting_contact, F.contact)
+async def agent_contact_received(msg: Message, state: FSMContext):
+    """Пользователь поделился контактом — ищем по реальному номеру."""
+    await state.clear()
+    await msg.answer("⏳ Проверяем…", reply_markup=ReplyKeyboardRemove())
+    uid = msg.from_user.id
+    phone = msg.contact.phone_number
+    # Сохраняем как основной номер в базе бота
+    await upsert_client(tg_id=uid, username=msg.from_user.username,
+                        first_name=msg.from_user.first_name,
+                        last_name=msg.from_user.last_name,
+                        phone=phone, lang=user_lang.get(uid, "ru"))
+
+    async def reply(text, kb, pm):
+        if pm:
+            await msg.answer(text, reply_markup=kb, parse_mode=pm)
+        else:
+            await msg.answer(text, reply_markup=kb)
+
+    await _do_agent_check(uid, phone, reply)
 
 @dp.callback_query(F.data == "agent_reset_pass")
 async def agent_reset_pass(cb: CallbackQuery):
