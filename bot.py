@@ -790,6 +790,30 @@ async def cmd_start(msg: Message, state: FSMContext):
         lang=user_lang.get(uid,"ru")
     )
 
+    # Deep link: /start tglink_{user_id} — привязка аккаунта сайта
+    args = msg.text.split(maxsplit=1)[1] if msg.text and " " in msg.text else ""
+    if args.startswith("tglink_"):
+        try:
+            site_user_id = int(args.split("_", 1)[1])
+            async with aiohttp.ClientSession() as s:
+                r = await s.post(f"{API_URL}/user/link-tg",
+                                 json={"user_id": site_user_id, "tg_id": uid,
+                                       "tg_username": msg.from_user.username},
+                                 timeout=aiohttp.ClientTimeout(total=8))
+                data = await r.json()
+            if data.get("ok"):
+                name = data.get("name") or "друг"
+                await msg.answer(
+                    f"✅ Telegram успешно привязан к вашему аккаунту на сайте!\n\n"
+                    f"Теперь вернитесь на сайт artez.uz и нажмите *Стать Агентом*.",
+                    parse_mode="Markdown")
+            else:
+                await msg.answer("❌ Не удалось привязать аккаунт. Попробуйте ещё раз.")
+        except Exception as e:
+            logging.warning(f"tglink error: {e}")
+            await msg.answer("❌ Ошибка привязки. Обратитесь к администратору.")
+        return
+
     if uid in user_lang:
         await msg.answer(t(uid,"menu_title"), reply_markup=menu_kb(uid), parse_mode="Markdown")
     else:
