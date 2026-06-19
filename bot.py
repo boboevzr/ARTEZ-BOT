@@ -986,11 +986,23 @@ async def agent_contact_received(msg: Message, state: FSMContext):
                         last_name=msg.from_user.last_name,
                         phone=phone, lang=user_lang.get(uid, "ru"))
 
+    kb_back = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="← Назад", callback_data="go_menu")]
+    ])
+
     async def reply(text, kb, pm):
+        # После получения контакта — не показываем кнопку контакта снова
         if pm:
             await msg.answer(text, reply_markup=kb, parse_mode=pm)
         else:
-            await msg.answer(text, reply_markup=kb)
+            # "не найден" — показываем сообщение со ссылкой на сайт
+            await msg.answer(
+                f"❌ Номер `{phone}` не найден на сайте artez\\.uz\n\n"
+                "Зарегистрируйтесь на сайте с этим номером, затем снова нажмите «Стать Агентом»",
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🌐 Зарегистрироваться", url="https://artez.uz")],
+                    [InlineKeyboardButton(text="← Назад", callback_data="go_menu")],
+                ]), parse_mode="MarkdownV2")
 
     await _do_agent_check(uid, phone, reply)
 
