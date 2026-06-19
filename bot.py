@@ -898,9 +898,14 @@ async def menu_agent(cb: CallbackQuery):
     await cb.answer()
     await cb.message.answer("⏳ Проверяем…")
 
+    # Телефон из базы бота (если пользователь его оставлял)
+    bot_client = await get_client_by_tg_id(uid)
+    bot_phone = bot_client.get("phone") if bot_client else None
+
     try:
         async with aiohttp.ClientSession() as s:
             r = await s.get(f"{API_URL}/agent/status-by-tg/{uid}",
+                            params={"phone": bot_phone} if bot_phone else {},
                             timeout=aiohttp.ClientTimeout(total=6))
             data = await r.json()
     except Exception:
@@ -926,7 +931,7 @@ async def menu_agent(cb: CallbackQuery):
         try:
             async with aiohttp.ClientSession() as s:
                 r = await s.post(f"{API_URL}/agent/apply-by-tg",
-                                 json={"tg_id": uid},
+                                 json={"tg_id": uid, "phone": bot_phone},
                                  timeout=aiohttp.ClientTimeout(total=8))
                 result = await r.json()
         except Exception:
