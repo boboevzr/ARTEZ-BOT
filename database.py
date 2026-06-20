@@ -233,6 +233,18 @@ async def create_tables():
                 ON CONFLICT (service_key, type_key) DO NOTHING
             """, defaults)
 
+    # Миграции для существующих БД
+    migrations = [
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS tg_phone VARCHAR(20) DEFAULT NULL",
+        "ALTER TABLE clients ADD COLUMN IF NOT EXISTS language VARCHAR(5) DEFAULT 'ru'",
+    ]
+    async with pool.acquire() as conn:
+        for sql in migrations:
+            try:
+                await conn.execute(sql)
+            except Exception:
+                pass
+
     logging.info("✅ Tables created/verified")
 
 
@@ -384,6 +396,14 @@ async def get_client_by_tg_id(tg_id: int) -> dict | None:
     async with pool.acquire() as conn:
         row = await conn.fetchrow("SELECT * FROM clients WHERE tg_id=$1", tg_id)
         return dict(row) if row else None
+
+async def update_client_tg_phone(tg_id: int, tg_phone: str):
+    """Сохраняет верифицированный Telegram-номер (из contact share) в clients.tg_phone."""
+    if not pool: return
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "UPDATE clients SET tg_phone=$2, updated_at=NOW() WHERE tg_id=$1",
+            tg_id, tg_phone)
 
 async def get_client_orders(tg_id: int):
     if not pool: return []

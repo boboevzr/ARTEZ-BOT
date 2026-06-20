@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone
 
 logging.basicConfig(level=logging.INFO)
 
@@ -962,7 +962,8 @@ async def menu_agent(cb: CallbackQuery, state: FSMContext):
     await cb.message.answer("⏳ Проверяем…")
 
     bot_client = await get_client_by_tg_id(uid)
-    bot_phone = bot_client.get("phone") if bot_client else None
+    # Предпочитаем верифицированный TG-номер, запасной — номер из заявки
+    bot_phone = (bot_client.get("tg_phone") or bot_client.get("phone")) if bot_client else None
 
     async def reply(text, kb, pm):
         if pm:
@@ -975,16 +976,19 @@ async def menu_agent(cb: CallbackQuery, state: FSMContext):
 
 @dp.message(AgentForm.waiting_contact, F.contact)
 async def agent_contact_received(msg: Message, state: FSMContext):
-    """Пользователь поделился контактом — ищем по реальному номеру."""
+    """Пользователь поделился контактом — сохраняем как tg_phone и ищем аккаунт."""
     await state.clear()
     await msg.answer("⏳ Проверяем…", reply_markup=ReplyKeyboardRemove())
     uid = msg.from_user.id
     phone = msg.contact.phone_number
-    # Сохраняем как основной номер в базе бота
+    if not phone.startswith("+"):
+        phone = "+" + phone
+    # Сохраняем в clients: phone (для заявок) и tg_phone (верифицированный)
     await upsert_client(tg_id=uid, username=msg.from_user.username,
                         first_name=msg.from_user.first_name,
                         last_name=msg.from_user.last_name,
                         phone=phone, lang=user_lang.get(uid, "ru"))
+    await update_client_tg_phone(uid, phone)
 
     kb_back = InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text="← Назад", callback_data="go_menu")]
