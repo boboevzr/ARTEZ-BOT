@@ -173,6 +173,22 @@ T = {
         "ask_phone":      "Шаг 2 из 7\n📞 Поделитесь номером или введите вручную:\n\nФормат: +998XXXXXXXXX",
         "btn_share_phone":"📱 Поделиться номером",
         "btn_enter_phone":"⌨️ Ввести другой номер",
+        "link_phone_prompt": (
+            "🔗 *Привязка номера к сайту ARTEZ*\n\n"
+            "Нажмите кнопку ниже, чтобы поделиться своим номером телефона.\n"
+            "После этого при регистрации на сайте *artez.uz* вы сможете получить код через Telegram вместо SMS."
+        ),
+        "link_phone_ok": (
+            "✅ *Номер привязан!*\n\n"
+            "📱 {phone}\n\n"
+            "Теперь зайдите на сайт *artez.uz*, выберите «Регистрация» и нажмите «Получить код в Telegram».\n\n"
+            "Если вы уже зарегистрированы — просто войдите в личный кабинет."
+        ),
+        "link_phone_ok_registered": (
+            "✅ *Телефон привязан!*\n\n"
+            "📱 {phone}\n\n"
+            "Вы уже зарегистрированы на сайте — просто войдите на *artez.uz*."
+        ),
         "ask_phone_manual":"✏️ Введите номер в формате:\n+998XXXXXXXXX\n\nПример: +998901234567",
         "phone_invalid":  "⚠️ Неверный формат!\n\nВведите номер строго в формате:\n*+998XXXXXXXXX*\n\nПример: +998901234567",
         "ask_address":    "Шаг 5 из 7\n🏠 Введите адрес вывоза ковра:",
@@ -270,6 +286,21 @@ T = {
         "ask_phone":      "2-qadam (7 dan)\n📞 Raqamingizni ulashing yoki qo'lda kiriting:\n\nFormat: +998XXXXXXXXX",
         "btn_share_phone":"📱 Raqamni ulashish",
         "btn_enter_phone":"⌨️ Boshqa raqam kiritish",
+        "link_phone_prompt": (
+            "🔗 *Sayt raqamini bog'lash*\n\n"
+            "Quyidagi tugmani bosing va raqamingizni ulashing.\n"
+            "Keyin *artez.uz* saytida ro'yxatdan o'tishda kodni SMS o'rniga Telegram orqali olishingiz mumkin."
+        ),
+        "link_phone_ok": (
+            "✅ *Raqam bog'landi!*\n\n"
+            "📱 {phone}\n\n"
+            "*artez.uz* saytiga o'ting, «Ro'yxatdan o'tish» ni tanlang va «Telegram orqali kod olish» tugmasini bosing."
+        ),
+        "link_phone_ok_registered": (
+            "✅ *Raqam bog'landi!*\n\n"
+            "📱 {phone}\n\n"
+            "Siz allaqachon saytda ro'yxatdan o'tgansiz — *artez.uz* ga kiring."
+        ),
         "ask_phone_manual":"✏️ Raqamni quyidagi formatda kiriting:\n+998XXXXXXXXX\n\nMisol: +998901234567",
         "phone_invalid":  "⚠️ Noto'g'ri format!\n\nRaqamni qat'iy formatda kiriting:\n*+998XXXXXXXXX*\n\nMisol: +998901234567",
         "ask_address":    "5-qadam (7 dan)\n🏠 Gilamni olib ketish manzilini kiriting:",
@@ -593,6 +624,9 @@ class AdminReply(StatesGroup):
 class AgentForm(StatesGroup):
     waiting_contact = State()  # ожидаем контакт для регистрации агента
 
+class LinkPhoneForm(StatesGroup):
+    waiting_contact = State()  # ожидаем контакт для привязки к сайту
+
 # ══════════════════════════════════════
 #  КЛАВИАТУРЫ
 # ══════════════════════════════════════
@@ -817,6 +851,16 @@ async def cmd_start(msg: Message, state: FSMContext):
             await msg.answer("❌ Ошибка привязки. Обратитесь к администратору.")
         return
 
+    # Deep link: /start link_phone — привязка телефона к сайту для регистрации
+    if args == "link_phone":
+        share_kb = ReplyKeyboardMarkup(
+            keyboard=[[KeyboardButton(text=t(uid,"btn_share_phone"), request_contact=True)]],
+            resize_keyboard=True, one_time_keyboard=True
+        )
+        await state.set_state(LinkPhoneForm.waiting_contact)
+        await msg.answer(t(uid,"link_phone_prompt"), reply_markup=share_kb, parse_mode="Markdown")
+        return
+
     if uid in user_lang:
         await msg.answer(t(uid,"menu_title"), reply_markup=menu_kb(uid), parse_mode="Markdown")
     else:
@@ -1009,6 +1053,44 @@ async def agent_contact_received(msg: Message, state: FSMContext):
                 ]), parse_mode="MarkdownV2")
 
     await _do_agent_check(uid, phone, reply)
+
+@dp.message(LinkPhoneForm.waiting_contact, F.contact)
+async def link_phone_contact_received(msg: Message, state: FSMContext):
+    """Пользователь поделился номером для привязки к сайту."""
+    await state.clear()
+    uid = msg.from_user.id
+    phone = msg.contact.phone_number
+    if not phone.startswith("+"):
+        phone = "+" + phone
+
+    # Принимаем только собственный контакт
+    if msg.contact.user_id and int(msg.contact.user_id) != uid:
+        await msg.answer("❌ " + ("Поделитесь своим номером." if user_lang.get(uid,"ru") == "ru" else "O'z raqamingizni ulashing."),
+                         reply_markup=ReplyKeyboardRemove())
+        return
+
+    await msg.answer("⏳", reply_markup=ReplyKeyboardRemove())
+
+    registered = False
+    try:
+        async with aiohttp.ClientSession() as s:
+            r = await s.post(f"{API_URL}/tg-phone-link",
+                             json={"phone": phone, "tg_id": uid},
+                             timeout=aiohttp.ClientTimeout(total=8))
+            data = await r.json()
+            registered = data.get("registered", False)
+    except Exception as e:
+        logging.warning(f"tg-phone-link error: {e}")
+
+    key = "link_phone_ok_registered" if registered else "link_phone_ok"
+    await msg.answer(
+        t(uid, key).format(phone=phone),
+        reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🌐 artez.uz", url="https://artez.uz")],
+            [InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")],
+        ]),
+        parse_mode="Markdown"
+    )
 
 @dp.callback_query(F.data == "agent_reset_pass")
 async def agent_reset_pass(cb: CallbackQuery):
