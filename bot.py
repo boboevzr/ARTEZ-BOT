@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked
 
 logging.basicConfig(level=logging.INFO)
 
@@ -807,6 +807,14 @@ async def notify_admin(text: str):
 async def cmd_start(msg: Message, state: FSMContext):
     await state.clear()
     uid = msg.from_user.id
+
+    # Проверка блокировки
+    try:
+        if await is_client_blocked(uid):
+            await msg.answer("🚫 Ваш аккаунт заблокирован. Обратитесь в поддержку.")
+            return
+    except Exception:
+        pass
 
     # Если язык ещё не известен в этой сессии — пробуем подгрузить из БД
     if uid not in user_lang:

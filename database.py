@@ -577,6 +577,12 @@ async def get_staff_by_role(role: str):
         )
 
 
+async def is_client_blocked(tg_id: int) -> bool:
+    if not pool: return False
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT blocked FROM clients WHERE tg_id=$1", tg_id)
+    return bool(row and row.get("blocked"))
+
 async def get_client_lang(tg_id: int):
     """Возвращает сохранённый язык клиента ('ru'/'uz') или None, если клиент не найден."""
     if not pool:
