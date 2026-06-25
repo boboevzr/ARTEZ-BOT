@@ -1037,10 +1037,47 @@ async def _do_agent_check(uid: int, phone: str | None, answer_fn):
 async def menu_agent(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
     await cb.answer()
-    await cb.message.answer("⏳ Проверяем…")
+    lang_u = user_lang.get(uid, "ru")
+    if lang_u == "uz":
+        info_text = (
+            "🤝 *ARTEZ Agenti bo'lish*\n\n"
+            "Agentlar mijozlarni jalb qilish orqali har bir buyurtmadan *komissiya* oladi\\.\n\n"
+            "📋 *Shartlar:*\n"
+            "• artez\\.uz saytida ro'yxatdan o'tgan bo'lish\n"
+            "• Referral havola orqali mijoz topib kelish\n"
+            "• Komissiya miqdori: buyurtma summasiga qarab\n\n"
+            "🔒 *Maxfiylik siyosati:* artez\\.uz/privacy\n\n"
+            "Davom etish uchun tasdiqlang:"
+        )
+        btn_confirm = "✅ Tasdiqlash — Agent bo'lish"
+        btn_cancel  = "❌ Bekor qilish"
+    else:
+        info_text = (
+            "🤝 *Стать Агентом ARTEZ*\n\n"
+            "Агенты привлекают клиентов и получают *комиссию* с каждого заказа\\.\n\n"
+            "📋 *Условия:*\n"
+            "• Быть зарегистрированным на artez\\.uz\n"
+            "• Приводить клиентов по реферальной ссылке\n"
+            "• Размер комиссии: зависит от суммы заказа\n\n"
+            "🔒 *Политика конфиденциальности:* artez\\.uz/privacy\n\n"
+            "Нажмите «Подтвердить» чтобы продолжить:"
+        )
+        btn_confirm = "✅ Подтвердить — Стать Агентом"
+        btn_cancel  = "❌ Отмена"
+
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=btn_confirm, callback_data="agent_confirm")],
+        [InlineKeyboardButton(text=btn_cancel,  callback_data="go_menu")],
+    ])
+    await cb.message.answer(info_text, reply_markup=kb, parse_mode="MarkdownV2")
+
+@dp.callback_query(F.data == "agent_confirm")
+async def agent_confirm(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.answer()
+    await cb.message.answer("⏳ Проверяем…" if user_lang.get(uid,"ru") == "ru" else "⏳ Tekshirilmoqda…")
 
     bot_client = await get_client_by_tg_id(uid)
-    # Предпочитаем верифицированный TG-номер, запасной — номер из заявки
     bot_phone = (bot_client.get("tg_phone") or bot_client.get("phone")) if bot_client else None
 
     async def reply(text, kb, pm):
