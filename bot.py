@@ -650,7 +650,6 @@ def menu_kb(uid):
         [InlineKeyboardButton(text=t(uid,"btn_operator"), callback_data="menu_operator"),
          InlineKeyboardButton(text=t(uid,"btn_info"),     callback_data="menu_info")],
         [InlineKeyboardButton(text=t(uid,"btn_profile"),  callback_data="menu_profile")],
-        [InlineKeyboardButton(text="🤝 Стать Агентом",   callback_data="menu_agent")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -1305,9 +1304,25 @@ async def menu_profile(cb: CallbackQuery):
         logging.warning(f"menu_profile error: {e}")
         phone_raw = None
         text = t(uid, "profile_text").format(name="—", phone="—", uid=uid, total=0, done=0, last="")
-    kb_rows = [[InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")]]
+
+    # Проверяем статус агента
+    is_agent = False
+    try:
+        async with aiohttp.ClientSession() as s:
+            r = await s.get(f"{API_URL}/agent/status-by-tg/{uid}",
+                            timeout=aiohttp.ClientTimeout(total=4))
+            is_agent = (await r.json()).get("is_agent", False)
+    except Exception:
+        pass
+
+    kb_rows = []
     if not phone_raw:
-        kb_rows.insert(0, [InlineKeyboardButton(text=t(uid,"profile_link_phone"), callback_data="link_phone_from_profile")])
+        kb_rows.append([InlineKeyboardButton(text=t(uid,"profile_link_phone"), callback_data="link_phone_from_profile")])
+    if is_agent:
+        kb_rows.append([InlineKeyboardButton(text="✅ Агент ARTEZ", url="https://artez.uz/staff.html")])
+    else:
+        kb_rows.append([InlineKeyboardButton(text="🤝 Стать Агентом", callback_data="menu_agent")])
+    kb_rows.append([InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")])
     await cb.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_rows), parse_mode="Markdown")
 
 @dp.callback_query(F.data == "link_phone_from_profile")
