@@ -157,6 +157,7 @@ T = {
         "profile_text":   "👤 *Ваш профиль*\n\n📛 Имя: {name}\n📞 Телефон: {phone}\n🆔 ID: {uid}\n\n📊 Заявок всего: *{total}*\n✅ Выполнено: *{done}*\n{last}",
         "profile_last":   "📅 Последняя заявка: {date}\n",
         "profile_nophone":"Не указан",
+        "profile_link_phone": "📞 Привязать номер",
         "btn_use_saved_phone": "✅ Использовать {phone}",
         "btn_enter_other_phone": "⌨️ Ввести другой номер",
         "ask_phone_saved":"Шаг 2 из 7\n📞 Использовать сохранённый номер?",
@@ -270,6 +271,7 @@ T = {
         "profile_text":   "👤 *Profilingiz*\n\n📛 Ism: {name}\n📞 Telefon: {phone}\n🆔 ID: {uid}\n\n📊 Jami buyurtmalar: *{total}*\n✅ Bajarildi: *{done}*\n{last}",
         "profile_last":   "📅 Oxirgi buyurtma: {date}\n",
         "profile_nophone":"Ko'rsatilmagan",
+        "profile_link_phone": "📞 Raqam ulash",
         "btn_use_saved_phone": "✅ {phone} dan foydalanish",
         "btn_enter_other_phone": "⌨️ Boshqa raqam kiritish",
         "ask_phone_saved":"2-qadam (7 dan)\n📞 Saqlangan raqamdan foydalanasizmi?",
@@ -1285,7 +1287,8 @@ async def menu_profile(cb: CallbackQuery):
                 last_d = ts.strftime("%d.%m.%Y") if hasattr(ts, "strftime") else str(ts)[:10]
         name_parts = [cb.from_user.first_name or "", cb.from_user.last_name or ""]
         name  = " ".join(p for p in name_parts if p) or "—"
-        phone = (client or {}).get("phone") or t(uid, "profile_nophone")
+        phone_raw = (client or {}).get("phone")
+        phone = phone_raw or t(uid, "profile_nophone")
         last_line = t(uid, "profile_last").format(date=last_d) if last_d else ""
         text = t(uid, "profile_text").format(
             name=name, phone=phone, uid=uid,
@@ -1293,8 +1296,34 @@ async def menu_profile(cb: CallbackQuery):
         )
     except Exception as e:
         logging.warning(f"menu_profile error: {e}")
+        phone_raw = None
         text = t(uid, "profile_text").format(name="—", phone="—", uid=uid, total=0, done=0, last="")
-    await cb.message.answer(text, reply_markup=back_kb(uid), parse_mode="Markdown")
+    kb_rows = [[InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")]]
+    if not phone_raw:
+        kb_rows.insert(0, [InlineKeyboardButton(text=t(uid,"profile_link_phone"), callback_data="link_phone_from_profile")])
+    await cb.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_rows), parse_mode="Markdown")
+
+@dp.callback_query(F.data == "link_phone_from_profile")
+async def link_phone_from_profile(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    saved_phone = await get_client_tg_phone(uid)
+    if saved_phone:
+        try:
+            async with aiohttp.ClientSession() as s:
+                await s.post(f"{API_URL}/tg-phone-link",
+                             json={"phone": saved_phone, "tg_id": uid},
+                             timeout=aiohttp.ClientTimeout(total=8))
+        except Exception as e:
+            logging.warning(f"link_phone_from_profile error: {e}")
+        await cb.message.answer(t(uid, "link_phone_ok").format(phone=saved_phone),
+                                reply_markup=back_kb(uid), parse_mode="Markdown")
+        return
+    share_kb = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text=t(uid,"btn_share_phone"), request_contact=True)]],
+        resize_keyboard=True, one_time_keyboard=True
+    )
+    await state.set_state(LinkPhoneForm.waiting_contact)
+    await cb.message.answer(t(uid,"link_phone_prompt"), reply_markup=share_kb, parse_mode="Markdown")
 
 @dp.callback_query(F.data == "menu_operator")
 async def menu_operator(cb: CallbackQuery, state: FSMContext):
