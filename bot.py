@@ -1106,6 +1106,13 @@ async def link_phone_contact_received(msg: Message, state: FSMContext):
 
     await msg.answer("⏳", reply_markup=ReplyKeyboardRemove())
 
+    # Сохраняем номер в профиль клиента (чтобы отображался в «Мой профиль»)
+    await upsert_client(tg_id=uid, username=msg.from_user.username,
+                        first_name=msg.from_user.first_name,
+                        last_name=msg.from_user.last_name,
+                        phone=phone, lang=user_lang.get(uid, "ru"))
+    await update_client_tg_phone(uid, phone)
+
     registered = False
     try:
         async with aiohttp.ClientSession() as s:
