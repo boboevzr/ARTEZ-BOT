@@ -599,6 +599,45 @@ async def set_client_lang(tg_id: int, lang: str):
 # ══════════════════════════════════════
 #  CRM SYNC (shared crm_clients table)
 # ══════════════════════════════════════
+# ══════════════════════════════════════
+#  ЛИДЫ (для обработки кнопки "Взять лид" в боте)
+# ══════════════════════════════════════
+async def get_staff_by_tg_id_for_lead(tg_id: int):
+    """Возвращает сотрудника artez_api по tg_id из таблицы staff."""
+    if not pool: return None
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT id, first_name, last_name, gender, role, login FROM staff WHERE tg_id=$1 AND active=TRUE",
+            str(tg_id))
+        return dict(row) if row else None
+
+async def take_lead(lead_id: int, staff_id: int, staff_name: str):
+    """Назначает лид на сотрудника. Возвращает ('ok'|'already_mine'|'taken', taker_name, lead_code)."""
+    if not pool: return ('error', '', '')
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT assigned_to, lead_code FROM leads WHERE id=$1", lead_id)
+        if not row:
+            return ('not_found', '', '')
+        if row['assigned_to'] and row['assigned_to'] != staff_id:
+            taker = await conn.fetchrow(
+                "SELECT first_name, last_name, gender FROM staff WHERE id=$1", row['assigned_to'])
+            taker_name = (f"{taker['first_name'] or ''} {taker['last_name'] or ''}".strip()
+                          if taker else 'другой сотрудник')
+            taker_verb = 'Взяла' if taker and taker.get('gender') == 'F' else 'Взял'
+            return ('taken', taker_name, taker_verb)
+        if row['assigned_to'] == staff_id:
+            return ('already_mine', '', '')
+        await conn.execute("UPDATE leads SET assigned_to=$1, updated_at=NOW() WHERE id=$2", staff_id, lead_id)
+        try:
+            await conn.execute("""
+                INSERT INTO lead_calls (lead_id, staff_id, action, note, created_at)
+                VALUES ($1,$2,'note',$3,NOW())
+            """, lead_id, staff_id, f"Лид взят через Telegram: {staff_name}")
+        except Exception:
+            pass
+        return ('ok', '', '')
+
+
 async def upsert_crm_client(phone: str, first_name: str = "", last_name: str = "",
                              tg_id: int = None, tg_username: str = None,
                              source: str = "bot"):

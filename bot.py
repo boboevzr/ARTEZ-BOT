@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead
 
 logging.basicConfig(level=logging.INFO)
 
@@ -1117,6 +1117,57 @@ async def link_phone_contact_received(msg: Message, state: FSMContext):
         parse_mode="Markdown"
     )
 
+@dp.callback_query(F.data.startswith("take_lead_"))
+async def cb_take_lead(cb: CallbackQuery):
+    """Сотрудник нажал 'Взять лид' в групповом чате."""
+    tg_user_id = cb.from_user.id
+    cq_data    = cb.data
+    orig_text  = cb.message.text or ""
+
+    try:
+        lead_id = int(cq_data.split("_")[2])
+    except (IndexError, ValueError):
+        await cb.answer("❌ Неверный формат данных", show_alert=True)
+        return
+
+    staff = await get_staff_by_tg_id_for_lead(tg_user_id)
+    if not staff:
+        await cb.answer(
+            "❌ Ваш Telegram не привязан к аккаунту сотрудника ARTEZ.\nОбратитесь к администратору.",
+            show_alert=True)
+        return
+    if staff.get("role") == "agent":
+        await cb.answer("❌ Агенты не могут брать лиды через Telegram.\nЛиды берут только сотрудники.", show_alert=True)
+        return
+
+    staff_id   = staff["id"]
+    staff_name = f"{staff.get('first_name') or ''} {staff.get('last_name') or ''}".strip() or staff.get("login", "")
+    took_verb  = "Взяла" if staff.get("gender") == "F" else "Взял"
+
+    result, taker_name, taker_verb = await take_lead(lead_id, staff_id, staff_name)
+
+    if result == 'not_found':
+        await cb.answer("❌ Лид не найден", show_alert=True)
+    elif result == 'already_mine':
+        await cb.answer("✅ Этот лид уже ваш!")
+    elif result == 'taken':
+        await cb.answer(f"❌ Лид уже взят: {taker_name or 'другой сотрудник'}", show_alert=True)
+        new_text = orig_text.rstrip("━" * 10).rstrip() + f"\n{'━'*10}\n✅ {taker_verb}: {taker_name or 'другой сотрудник'}"
+        try:
+            await cb.message.edit_text(new_text)
+        except Exception:
+            pass
+    elif result == 'ok':
+        await cb.answer("✅ Лид взят! Откройте приложение.")
+        new_text = orig_text.rstrip("━" * 10).rstrip() + f"\n{'━'*10}\n✅ {took_verb}: {staff_name}"
+        try:
+            await cb.message.edit_text(new_text)
+        except Exception:
+            pass
+    else:
+        await cb.answer("❌ Ошибка базы данных", show_alert=True)
+
+
 @dp.callback_query(F.data == "agent_reset_pass")
 async def agent_reset_pass(cb: CallbackQuery):
     uid = cb.from_user.id
@@ -2052,6 +2103,12 @@ async def main():
     await load_prices()
     await load_units()
     await load_site_settings()
+    # Удаляем webhook если был установлен (artez_api мог его поставить)
+    try:
+        await bot.delete_webhook(drop_pending_updates=True)
+        logging.info("✅ Webhook deleted, switching to polling")
+    except Exception as e:
+        logging.warning(f"delete_webhook error: {e}")
     logging.info("✅ Bot started, polling...")
     await dp.start_polling(bot)
 
