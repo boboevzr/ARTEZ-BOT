@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone
 
 logging.basicConfig(level=logging.INFO)
 
@@ -853,6 +853,31 @@ async def cmd_start(msg: Message, state: FSMContext):
 
     # Deep link: /start link_phone — привязка телефона к сайту для регистрации
     if args == "link_phone":
+        # Проверяем — вдруг пользователь уже делился номером раньше
+        saved_phone = await get_client_tg_phone(uid)
+        if saved_phone:
+            # Есть сохранённый номер — сразу привязываем без повторного шаринга
+            registered = False
+            try:
+                async with aiohttp.ClientSession() as s:
+                    r = await s.post(f"{API_URL}/tg-phone-link",
+                                     json={"phone": saved_phone, "tg_id": uid},
+                                     timeout=aiohttp.ClientTimeout(total=8))
+                    data = await r.json()
+                    registered = data.get("registered", False)
+            except Exception as e:
+                logging.warning(f"tg-phone-link (saved) error: {e}")
+            key = "link_phone_ok_registered" if registered else "link_phone_ok"
+            await msg.answer(
+                t(uid, key).format(phone=saved_phone),
+                reply_markup=InlineKeyboardMarkup(inline_keyboard=[
+                    [InlineKeyboardButton(text="🌐 artez.uz", url="https://artez.uz")],
+                    [InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")],
+                ]),
+                parse_mode="Markdown"
+            )
+            return
+        # Номера нет — просим поделиться
         share_kb = ReplyKeyboardMarkup(
             keyboard=[[KeyboardButton(text=t(uid,"btn_share_phone"), request_contact=True)]],
             resize_keyboard=True, one_time_keyboard=True

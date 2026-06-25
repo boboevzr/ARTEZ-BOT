@@ -405,6 +405,15 @@ async def update_client_tg_phone(tg_id: int, tg_phone: str):
             "UPDATE clients SET tg_phone=$2, updated_at=NOW() WHERE tg_id=$1",
             tg_id, tg_phone)
 
+async def get_client_tg_phone(tg_id: int) -> str | None:
+    """Возвращает сохранённый верифицированный номер клиента (tg_phone или phone)."""
+    if not pool: return None
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT tg_phone, phone FROM clients WHERE tg_id=$1", tg_id)
+    if not row: return None
+    return row["tg_phone"] or row["phone"] or None
+
 async def get_client_orders(tg_id: int):
     if not pool: return []
     async with pool.acquire() as conn:
