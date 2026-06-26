@@ -553,7 +553,7 @@ TYPE_NAMES_UZ = {"standard": "Standart", "express": "Tezkor"}
 def build_prices_text(uid):
     is_uz = lang(uid) == "uz"
     names = SERVICE_NAMES_UZ if is_uz else SERVICE_NAMES_RU
-    title = "💰 *ARTEZ narx-navo*" if is_uz else "💰 *Прайс-лист ARTEZ*"
+    title = "💰 ARTEZ narx-navo" if is_uz else "💰 Прайс-лист ARTEZ"
     currency = "so'm" if is_uz else "сум"
     lines = [title, ""]
     min_groups: dict = {}  # {(min_val, unit_sym): [svc_name,...]}
@@ -572,32 +572,35 @@ def build_prices_text(uid):
             price_parts.append(f"{std['price']:,}".replace(",", " "))
         if exp:
             price_parts.append(f"{exp['price']:,}".replace(",", " "))
-        lines.append(f"🔹 *{svc_name}* — {' / '.join(price_parts)} {currency}/{unit_sym}")
+        lines.append(f"🔹 {svc_name} ")
+        lines.append(f"— {' / '.join(price_parts)} {currency}/{unit_sym}")
         if std and std.get("min_order"):
             key = (std["min_order"], unit_sym)
             min_groups.setdefault(key, []).append(svc_name)
 
     lines.append("")
     if min_groups:
-        min_parts = []
-        for (mo, unit_sym), svc_names in min_groups.items():
-            mo_str = int(mo) if mo == int(mo) else mo
-            min_parts.append(f"{mo_str} {unit_sym} ({', '.join(svc_names)})")
         if is_uz:
-            lines.append("📦 Min buyurtma: " + " · ".join(min_parts))
-            lines.append("_Standart / Ekspress_")
-            lines.append("🚚 Olib ketish va yetkazish — *bepul*")
+            lines.append("📦 Min buyurtma: ")
+            for (mo, unit_sym), svc_names in min_groups.items():
+                mo_str = int(mo) if mo == int(mo) else mo
+                lines.append(f"{mo_str} {unit_sym} ({', '.join(svc_names)}) ")
+            lines.append("Standart / Ekspress")
+            lines.append("🚚 Olib ketish va yetkazish — bepul")
         else:
-            lines.append("📦 Мин. заказ: " + " · ".join(min_parts))
-            lines.append("_Стандарт / Экспресс_")
-            lines.append("🚚 Вывоз и доставка — *бесплатно*")
+            lines.append("📦 Мин. заказ: ")
+            for (mo, unit_sym), svc_names in min_groups.items():
+                mo_str = int(mo) if mo == int(mo) else mo
+                lines.append(f"{mo_str} {unit_sym} ({', '.join(svc_names)}) ")
+            lines.append("Стандарт / Экспресс")
+            lines.append("🚚 Вывоз и доставка — бесплатно")
     else:
         if is_uz:
-            lines.append("_Standart / Ekspress_")
-            lines.append("🚚 Olib ketish va yetkazish — *bepul*")
+            lines.append("Standart / Ekspress")
+            lines.append("🚚 Olib ketish va yetkazish — bepul")
         else:
-            lines.append("_Стандарт / Экспресс_")
-            lines.append("🚚 Вывоз и доставка — *бесплатно*")
+            lines.append("Стандарт / Экспресс")
+            lines.append("🚚 Вывоз и доставка — бесплатно")
     return "\n".join(lines)
 
 
