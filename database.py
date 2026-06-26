@@ -614,7 +614,7 @@ async def get_staff_by_tg_id_for_lead(tg_id: int):
     async with pool.acquire() as conn:
         row = await conn.fetchrow(
             "SELECT id, first_name, last_name, gender, role, login FROM staff WHERE tg_id=$1 AND active=TRUE",
-            str(tg_id))
+            int(tg_id))
         return dict(row) if row else None
 
 async def take_lead(lead_id: int, staff_id: int, staff_name: str):
