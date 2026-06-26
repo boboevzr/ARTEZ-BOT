@@ -243,6 +243,13 @@ T = {
         "operator_msg":   "💬 *Сообщение клиенту*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Заявка отменена. Возвращаемся в меню.",
         "btn_cancel":     "❌ Отмена",
+        "ask_order_type": "📋 Выберите тип заявки:",
+        "btn_order_quick":"⚡ Быстрая заявка",
+        "btn_order_full": "📋 Подробная заявка",
+        "quick_ask_name": "⚡ *Быстрая заявка*\n\nШаг 1 из 3\n👤 Введите ваше имя:",
+        "quick_ask_phone":"Шаг 2 из 3\n📞 Поделитесь номером или введите вручную:\n\nФормат: +998XXXXXXXXX",
+        "quick_ask_branch":"Шаг 3 из 3\n🏢 Выберите филиал:",
+        "quick_done":     "✅ *Заявка принята!*\n\nМы свяжемся с вами в ближайшее время.\n\n☎️ Короткий номер: *1221*\n📞 +998 79 222-12-21",
         "btn_svc_carpet":      "🧺 Чистка ковра",
         "btn_svc_carpet_home": "🏠 Чистка ковра на дому",
         "btn_svc_sofa":        "🛋 Чистка диван, кресло",
@@ -356,6 +363,13 @@ T = {
         "operator_msg":   "💬 *Mijozdan xabar*\n\n👤 {name}\n💬 {msg}\n🆔 Chat: {cid}",
         "cancel":         "❌ Ariza bekor qilindi. Menyuga qaytamiz.",
         "btn_cancel":     "❌ Bekor qilish",
+        "ask_order_type": "📋 Ariza turini tanlang:",
+        "btn_order_quick":"⚡ Tezkor ariza",
+        "btn_order_full": "📋 Batafsil ariza",
+        "quick_ask_name": "⚡ *Tezkor ariza*\n\n1-qadam (3 dan)\n👤 Ismingizni kiriting:",
+        "quick_ask_phone":"2-qadam (3 dan)\n📞 Raqamingizni ulashing yoki qo'lda kiriting:\n\nFormat: +998XXXXXXXXX",
+        "quick_ask_branch":"3-qadam (3 dan)\n🏢 Filialni tanlang:",
+        "quick_done":     "✅ *Ariza qabul qilindi!*\n\nTez orada siz bilan bog'lanamiz.\n\n☎️ Qisqa raqam: *1221*\n📞 +998 79 222-12-21",
         "btn_svc_carpet":      "🧺 Gilam tozalash",
         "btn_svc_carpet_home": "🏠 Gilamni uyda tozalash",
         "btn_svc_sofa":        "🛋 Divan, kreslo tozalash",
@@ -627,6 +641,11 @@ class OrderForm(StatesGroup):
     time        = State()
     time_from   = State()   # ввод периода «с»
     time_to     = State()   # ввод периода «до»
+
+class QuickForm(StatesGroup):
+    name   = State()
+    phone  = State()
+    branch = State()
 
 class CalcForm(StatesGroup):
     width   = State()
@@ -1503,9 +1522,189 @@ async def admin_reply_send(msg: Message, state: FSMContext):
 @dp.callback_query(F.data == "menu_order")
 async def menu_order(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
+    await cb.answer()
+    kb = InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=t(uid,"btn_order_quick"), callback_data="order_type_quick")],
+        [InlineKeyboardButton(text=t(uid,"btn_order_full"),  callback_data="order_type_full")],
+        [InlineKeyboardButton(text=t(uid,"btn_cancel"),      callback_data="cancel_order")],
+    ])
+    await cb.message.answer(t(uid,"ask_order_type"), reply_markup=kb)
+
+@dp.callback_query(F.data == "order_type_full")
+async def menu_order_full(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.answer()
     user_data_db[uid] = {}
     await state.set_state(OrderForm.name)
     await cb.message.answer(t(uid,"ask_name"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
+
+@dp.callback_query(F.data == "order_type_quick")
+async def menu_order_quick(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.answer()
+    user_data_db[uid] = {"_quick": True}
+    await state.set_state(QuickForm.name)
+    await cb.message.answer(t(uid,"quick_ask_name"), reply_markup=cancel_kb(uid), parse_mode="Markdown")
+
+_PHONE_RE_BOT = re.compile(r"^\+998\d{9}$")
+
+def normalize_phone_bot(raw: str) -> str:
+    """Normalize phone to +998XXXXXXXXX, return empty string if invalid."""
+    v = raw.strip().replace(" ","").replace("-","").replace("(","").replace(")","")
+    if v.startswith("998") and not v.startswith("+"):
+        v = "+" + v
+    return v if _PHONE_RE_BOT.match(v) else ""
+
+async def _submit_bot_lead(uid: int, d: dict, is_quick: bool = False, user_from=None) -> bool:
+    """POST lead to /api/bot/lead. Returns True on success."""
+    try:
+        user_obj   = user_from
+        first_name = getattr(user_obj, 'first_name', '') or d.get("name", "")
+        last_name  = getattr(user_obj, 'last_name',  '') or ''
+        username   = getattr(user_obj, 'username',   '') or ''
+        client_name = d.get("name") or f"{first_name} {last_name}".strip() or f"TG {uid}"
+
+        note_parts = []
+        if username: note_parts.append(f"@{username}")
+        if d.get("service_type"): note_parts.append(f"Тип: {d['service_type']}")
+        if d.get("date"):         note_parts.append(f"Дата: {d['date']}")
+
+        payload = {
+            "client_name":    client_name,
+            "client_phone":   d.get("phone",""),
+            "branch":         d.get("branch",""),
+            "city":           d.get("city",""),
+            "address":        d.get("address",""),
+            "service":        d.get("service",""),
+            "service_type":   d.get("service_type",""),
+            "pickup_date":    d.get("date",""),
+            "pickup_time":    d.get("time",""),
+            "note":           " · ".join(note_parts) if note_parts else "",
+            "location":       d.get("location",""),
+            "location_address": d.get("location_address",""),
+            "client_tg_id":   uid,
+            "is_quick":       is_quick,
+        }
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{API_URL}/bot/lead",
+                json=payload,
+                headers={"X-Bot-Token": BOT_TOKEN or ""},
+                timeout=aiohttp.ClientTimeout(total=10)
+            ) as r:
+                return r.status == 200
+    except Exception as e:
+        logging.warning(f"_submit_bot_lead error: {e}")
+        return False
+
+# ── БЫСТРАЯ ЗАЯВКА ──
+@dp.message(QuickForm.name)
+async def quick_name(msg: Message, state: FSMContext):
+    uid = msg.from_user.id
+    user_data_db.setdefault(uid, {})["name"] = msg.text.strip()
+    await state.set_state(QuickForm.phone)
+    try:
+        client = await get_client_by_tg_id(uid)
+        saved_phone = (client or {}).get("phone") or ""
+    except Exception:
+        saved_phone = ""
+    if saved_phone:
+        user_data_db[uid]["_saved_phone"] = saved_phone
+        kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(
+                text=t(uid,"btn_use_saved_phone").format(phone=saved_phone),
+                callback_data="qphone_use_saved"
+            ),
+            InlineKeyboardButton(text=t(uid,"btn_enter_other_phone"), callback_data="qphone_enter_other"),
+        ],[
+            InlineKeyboardButton(text=t(uid,"btn_cancel"), callback_data="cancel_order"),
+        ]])
+        saved_txt = t(uid,"ask_phone_saved") if lang(uid)=="ru" else "2-qadam (3 dan)\n📞 Saqlangan raqamdan foydalanasizmi?"
+        await msg.answer(saved_txt, reply_markup=kb, parse_mode="Markdown")
+    else:
+        await msg.answer(t(uid,"quick_ask_phone"), reply_markup=phone_kb(uid), parse_mode="Markdown")
+
+@dp.callback_query(QuickForm.phone, F.data == "qphone_use_saved")
+async def quick_phone_use_saved(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.answer()
+    user_data_db[uid]["phone"] = user_data_db[uid].get("_saved_phone","")
+    await state.set_state(QuickForm.branch)
+    await cb.message.answer(t(uid,"quick_ask_branch"), reply_markup=branch_kb_quick(uid))
+
+@dp.callback_query(QuickForm.phone, F.data == "qphone_enter_other")
+async def quick_phone_enter_other(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.answer()
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
+    await cb.message.answer(t(uid,"quick_ask_phone"), reply_markup=phone_kb(uid), parse_mode="Markdown")
+
+@dp.message(QuickForm.phone, F.contact)
+async def quick_phone_contact(msg: Message, state: FSMContext):
+    uid = msg.from_user.id
+    raw = msg.contact.phone_number or ""
+    norm = normalize_phone_bot(raw)
+    if not norm:
+        await msg.answer(t(uid,"phone_invalid"), reply_markup=phone_kb(uid), parse_mode="Markdown")
+        return
+    user_data_db.setdefault(uid, {})["phone"] = norm
+    await state.set_state(QuickForm.branch)
+    await msg.answer("✅", reply_markup=ReplyKeyboardRemove())
+    await msg.answer(t(uid,"quick_ask_branch"), reply_markup=branch_kb_quick(uid))
+
+@dp.message(QuickForm.phone, F.text)
+async def quick_phone_text(msg: Message, state: FSMContext):
+    uid = msg.from_user.id
+    raw = (msg.text or "").strip()
+    if raw == t(uid,"btn_enter_phone"):
+        await msg.answer(t(uid,"ask_phone_manual"), reply_markup=cancel_kb(uid))
+        return
+    norm = normalize_phone_bot(raw)
+    if not norm:
+        await msg.answer(t(uid,"phone_invalid"), reply_markup=phone_kb(uid), parse_mode="Markdown")
+        return
+    user_data_db.setdefault(uid, {})["phone"] = norm
+    await state.set_state(QuickForm.branch)
+    await msg.answer("✅", reply_markup=ReplyKeyboardRemove())
+    await msg.answer(t(uid,"quick_ask_branch"), reply_markup=branch_kb_quick(uid))
+
+@dp.callback_query(QuickForm.branch, F.data.in_({"qbranch_zarafshan","qbranch_navoi"}))
+async def quick_branch(cb: CallbackQuery, state: FSMContext):
+    uid = cb.from_user.id
+    await cb.answer()
+    branch = cb.data.replace("qbranch_","")
+    user_data_db[uid]["branch"]      = branch
+    user_data_db[uid]["branch_name"] = t(uid,"btn_zarafshan") if branch=="zarafshan" else t(uid,"btn_navoi")
+    await finish_quick(cb.message, uid, state, user_from=cb.from_user)
+
+def branch_kb_quick(uid):
+    return InlineKeyboardMarkup(inline_keyboard=[[
+        InlineKeyboardButton(text=t(uid,"btn_zarafshan"), callback_data="qbranch_zarafshan"),
+        InlineKeyboardButton(text=t(uid,"btn_navoi"),     callback_data="qbranch_navoi"),
+    ],[
+        InlineKeyboardButton(text=t(uid,"btn_cancel"), callback_data="cancel_order"),
+    ]])
+
+async def finish_quick(msg, uid: int, state: FSMContext, user_from=None):
+    d = user_data_db.get(uid, {})
+    user_obj = user_from or getattr(msg, 'from_user', None)
+    first_name = getattr(user_obj, 'first_name', '') or ''
+    last_name  = getattr(user_obj, 'last_name',  '') or ''
+    username   = getattr(user_obj, 'username',   '') or ''
+
+    await upsert_client(tg_id=uid, username=username,
+                        first_name=first_name, last_name=last_name,
+                        phone=d.get("phone",""), lang=lang(uid))
+
+    result = await _submit_bot_lead(uid, d, is_quick=True, user_from=user_from)
+    await state.clear()
+    if result:
+        await msg.answer(t(uid,"quick_done"), reply_markup=back_kb(uid), parse_mode="Markdown")
+    else:
+        await msg.answer("✅ " + t(uid,"quick_done"), reply_markup=back_kb(uid), parse_mode="Markdown")
 
 @dp.message(OrderForm.name)
 async def order_name(msg: Message, state: FSMContext):
@@ -1769,86 +1968,26 @@ async def order_time_to(msg: Message, state: FSMContext):
 
 async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, user_from=None):
     d = user_data_db.get(uid, {})
-    order_num = await get_next_order_num()
-    dt = now_local().strftime("%d.%m.%Y %H:%M")
     answer_fn = msg_or_cb.answer
 
-    # Данные клиента из Telegram
-    user_obj = user_from or getattr(msg_or_cb, 'from_user', None)
+    user_obj   = user_from or getattr(msg_or_cb, 'from_user', None)
     first_name = getattr(user_obj, 'first_name', '') or ''
     last_name  = getattr(user_obj, 'last_name',  '') or ''
     username   = getattr(user_obj, 'username',   '') or ''
     tg_name    = f"{first_name} {last_name}".strip() or f"@{username}"
 
-    # Сохраняем в PostgreSQL
-    await save_order({
-        "order_num":          order_num,
-        "source":             "bot",
-        "client_tg_id":       uid,
-        "client_tg_username": username,
-        "client_first_name":  first_name,
-        "client_last_name":   last_name,
-        "phone":              d.get("phone",""),
-        "branch":             d.get("branch",""),
-        "city":               d.get("city",""),
-        "address":            d.get("address",""),
-        "location":           d.get("location",""),
-        "service":            d.get("service",""),
-        "pickup_date":        d.get("date",""),
-        "pickup_time":        time_txt,
-        "note":               f"Тип услуги: {d.get('service_type','')}",
-    })
+    d["time"] = time_txt
 
-    # Обновляем клиента в боте
-    await upsert_client(
-        tg_id=uid, username=username,
-        first_name=first_name, last_name=last_name,
-        phone=d.get("phone",""), lang=lang(uid)
-    )
-    # Синхронизируем в CRM
+    await upsert_client(tg_id=uid, username=username,
+                        first_name=first_name, last_name=last_name,
+                        phone=d.get("phone",""), lang=lang(uid))
     if d.get("phone",""):
-        await upsert_crm_client(
-            phone=d["phone"], first_name=first_name, last_name=last_name,
-            tg_id=uid, tg_username=username, source="bot"
-        )
+        await upsert_crm_client(phone=d["phone"], first_name=first_name, last_name=last_name,
+                                tg_id=uid, tg_username=username, source="bot")
 
-    # Уведомление клиенту
-    await answer_fn(
-        t(uid,"order_done").format(num=order_num),
-        reply_markup=back_kb(uid), parse_mode="Markdown"
-    )
+    await _submit_bot_lead(uid, d, is_quick=False, user_from=user_from)
 
-    # Уведомление в группу
-    loc_raw  = d.get("location","") or ""
-    loc_addr = d.get("location_address","") or ""
-    loc_display = loc_addr if loc_addr else (loc_raw.strip() if loc_raw else "—")
-    location_url = None
-    if loc_raw:
-        try:
-            la_s, lo_s = loc_raw.split(",", 1)
-            location_url = f"https://yandex.uz/maps/?pt={lo_s.strip()},{la_s.strip()}&z=16"
-        except Exception:
-            pass
-    summary = (
-        f"📋 Новая заявка {order_num} (бот)\n"
-        f"━━━━━━━━━━\n"
-        f"👤 {md_escape(d.get('name',''))}\n"
-        f"🆔 {uid}\n"
-        f"📞 {md_escape(d.get('phone',''))}\n"
-        f"🏢 {md_escape(d.get('branch_name',''))}\n"
-        f"📍 {md_escape(d.get('city',''))}\n"
-        f"🏠 {md_escape(d.get('address',''))}\n"
-        f"🗺 {md_escape(loc_display)}\n"
-        f"🧺 {md_escape(d.get('service',''))}\n"
-        f"⚙️ {md_escape(d.get('service_type',''))}\n"
-        f"📅 {md_escape(d.get('date',''))}\n"
-        f"🕐 {md_escape(time_txt)}\n"
-        f"━━━━━━━━━━\n"
-        f"🕒 {dt}"
-    )
-    raw_phone = (d.get("phone","") or "").strip()
-    client_phone = re.sub(r"[\s\-]", "", raw_phone)
-    await notify_group(summary, order_num=order_num, client_id=uid, phone=client_phone, username=username, location_url=location_url, branch=d.get("branch",""))
+    await answer_fn(t(uid,"quick_done"), reply_markup=back_kb(uid), parse_mode="Markdown")
 
     # В Google Таблицу
     await send_to_sheets({
@@ -1865,7 +2004,7 @@ async def finish_order(msg_or_cb, uid: int, time_txt: str, state: FSMContext, us
         "service_type": d.get("service_type",""),
         "date":        d.get("date",""),
         "time":        time_txt,
-        "note":        f"Telegram (бот) {order_num}",
+        "note":        f"Telegram (бот, подробная заявка)",
         "status":      "Новый",
     })
     await state.clear()
