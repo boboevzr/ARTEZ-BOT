@@ -221,8 +221,8 @@ T = {
         "calc_ask_w":     "Введите ширину в сантиметрах:\n\nПример: 200 (= 2 метра)",
         "calc_ask_l":     "Теперь введите длину в сантиметрах:\n\nПример: 300 (= 3 метра)",
         "calc_ask_svc":   "🧮 *Калькулятор стоимости*\n\nВыберите услугу:",
-        "calc_result":    "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} {unit}*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/{unit}\n\n💵 *Итого: {total} сум*\n\n_(Минимальный заказ {min_order} {unit})_",
-        "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = *{sqm} {unit}*\n🧺 Услуга: {svc}\n💰 Цена: {price} сум/{unit}\n\n💵 *Итого: {total} сум*",
+        "calc_result_below_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = {sqm} {unit}\n🧺 {svc}\n💰 {price} сум/{unit}\n\n⚠️ Ваш размер {sqm} {unit} — меньше мин. заказа ({min_order} {unit})\n💵 *Итого: {total} сум* _(за {min_order} {unit})_",
+        "calc_result_no_min": "🧮 *Расчёт стоимости*\n\n📐 Размер: {w} × {l} см = {sqm} {unit}\n🧺 {svc}\n💰 {price} сум/{unit}\n\n💵 *Итого: {total} сум*",
         "branches_text":  "📍 *Наши филиалы*\n\n🏢 *Филиал Зарафшан*\nОбслуживает: Зарафшан, Учкудук, Тамдинский район\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Филиал Навои*\nОбслуживает: Навои и все остальные районы области\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Акции и скидки*\n\n🔥 При заказе от 3 ковров — скидка до 20%\n🚚 На все заказы — бесплатная доставка и забор\n🚗 Если у вас свой автомобиль — скидка до 20% на страховой полис ОСАГО\n📢 Подписчикам нашей Telegram-группы и Instagram — скидка до 30%\n\nПодпишитесь и получите скидку 👇",
         "btn_promo_telegram": "📢 Telegram-группа",
@@ -334,8 +334,8 @@ T = {
         "calc_ask_w":     "Enini santimetrda kiriting:\n\nMisol: 200 (= 2 metr)",
         "calc_ask_l":     "Endi bo'yini santimetrda kiriting:\n\nMisol: 300 (= 3 metr)",
         "calc_ask_svc":   "🧮 *Narx kalkulyatori*\n\nXizmatni tanlang:",
-        "calc_result":    "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} {unit}*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/{unit}\n\n💵 *Jami: {total} so'm*\n\n_(Minimal buyurtma {min_order} {unit})_",
-        "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = *{sqm} {unit}*\n🧺 Xizmat: {svc}\n💰 Narx: {price} so'm/{unit}\n\n💵 *Jami: {total} so'm*",
+        "calc_result_below_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = {sqm} {unit}\n🧺 {svc}\n💰 {price} so'm/{unit}\n\n⚠️ Sizning o'lchamingiz {sqm} {unit} — minimal buyurtmadan kam ({min_order} {unit})\n💵 *Jami: {total} so'm* _({min_order} {unit} uchun)_",
+        "calc_result_no_min": "🧮 *Narx hisobi*\n\n📐 O'lcham: {w} × {l} sm = {sqm} {unit}\n🧺 {svc}\n💰 {price} so'm/{unit}\n\n💵 *Jami: {total} so'm*",
         "branches_text":  "📍 *Filiallarimiz*\n\n🏢 *Zarafshon filiali*\nXizmat ko'rsatadi: Zarafshon, Uchquduq, Tomdi tumani\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 88 200-12-21\n📱 +998 94 738-04-44\n\n🏢 *Navoiy filiali*\nXizmat ko'rsatadi: Navoiy va viloyatning boshqa tumanlari\n📞 1221\n📱 +998 79 222-12-21\n📱 +998 99 750-00-20\n📱 +998 99 112-48-48",
         "promo_text":     "🎁 *Aksiyalar va chegirmalar*\n\n🔥 3 ta va undan ko'p gilam buyurtma qilsangiz — 20% gacha chegirma\n🚚 Barcha buyurtmalar uchun — bepul olib ketish va yetkazish\n🚗 Agar shaxsiy avtomobilingiz bo'lsa — OSAGO sug'urta polisiga 20% gacha chegirma\n📢 Telegram-guruhimiz va Instagram'ga obuna bo'lganlar uchun — 30% gacha chegirma\n\nObuna bo'ling va chegirma oling 👇",
         "btn_promo_telegram": "📢 Telegram-guruh",
@@ -553,37 +553,51 @@ TYPE_NAMES_UZ = {"standard": "Standart", "express": "Tezkor"}
 def build_prices_text(uid):
     is_uz = lang(uid) == "uz"
     names = SERVICE_NAMES_UZ if is_uz else SERVICE_NAMES_RU
-    types = TYPE_NAMES_UZ if is_uz else TYPE_NAMES_RU
     title = "💰 *ARTEZ narx-navo*" if is_uz else "💰 *Прайс-лист ARTEZ*"
+    currency = "so'm" if is_uz else "сум"
     lines = [title, ""]
+    min_groups: dict = {}  # {(min_val, unit_sym): [svc_name,...]}
+
     for svc in SERVICE_KEYS:
         svc_name = names.get(svc, svc)
         prices = PRICE_CACHE.get(svc, DEFAULT_PRICES.get(svc, {}))
-        parts = []
-        min_orders = []
-        for tk in TYPE_KEYS:
-            entry = prices.get(tk)
-            if entry:
-                unit_sym = get_unit_symbol(entry.get("unit_key", "m2"), uid)
-                price_str = f"{entry['price']:,}".replace(",", " ")
-                currency = "so'm" if is_uz else "сум"
-                parts.append(f"{types.get(tk, tk)}: {price_str} {currency}/{unit_sym}")
-                if entry.get("min_order"):
-                    min_orders.append((entry["min_order"], unit_sym))
-        line = f"🧺 *{svc_name}*\n   " + "\n   ".join(parts)
-        if min_orders:
-            mo, unit_sym = min_orders[0]
-            mo_str = int(mo) if mo == int(mo) else mo
-            if is_uz:
-                line += f"\n   📦 Minimal buyurtma — {mo_str} {unit_sym}"
-            else:
-                line += f"\n   📦 Минимальный заказ — {mo_str} {unit_sym}"
-        lines.append(line)
+        std = prices.get("standard")
+        exp = prices.get("express")
+        if not std and not exp:
+            continue
+        entry = std or exp
+        unit_sym = get_unit_symbol(entry.get("unit_key", "m2"), uid)
+        price_parts = []
+        if std:
+            price_parts.append(f"{std['price']:,}".replace(",", " "))
+        if exp:
+            price_parts.append(f"{exp['price']:,}".replace(",", " "))
+        lines.append(f"🔹 *{svc_name}* — {' / '.join(price_parts)} {currency}/{unit_sym}")
+        if std and std.get("min_order"):
+            key = (std["min_order"], unit_sym)
+            min_groups.setdefault(key, []).append(svc_name)
+
     lines.append("")
-    if is_uz:
-        lines.append("🚚 Olib ketish va yetkazish — *bepul*")
+    if min_groups:
+        min_parts = []
+        for (mo, unit_sym), svc_names in min_groups.items():
+            mo_str = int(mo) if mo == int(mo) else mo
+            min_parts.append(f"{mo_str} {unit_sym} ({', '.join(svc_names)})")
+        if is_uz:
+            lines.append("📦 Min buyurtma: " + " · ".join(min_parts))
+            lines.append("_Standart / Ekspress_")
+            lines.append("🚚 Olib ketish va yetkazish — *bepul*")
+        else:
+            lines.append("📦 Мин. заказ: " + " · ".join(min_parts))
+            lines.append("_Стандарт / Экспресс_")
+            lines.append("🚚 Вывоз и доставка — *бесплатно*")
     else:
-        lines.append("🚚 Вывоз и доставка — *бесплатно*")
+        if is_uz:
+            lines.append("_Standart / Ekspress_")
+            lines.append("🚚 Olib ketish va yetkazish — *bepul*")
+        else:
+            lines.append("_Стандарт / Экспресс_")
+            lines.append("🚚 Вывоз и доставка — *бесплатно*")
     return "\n".join(lines)
 
 
@@ -1918,18 +1932,17 @@ async def calc_length(msg: Message, state: FSMContext):
     total     = int(sqm_bill * price)
     unit_sym  = get_unit_symbol(get_cached_unit_key(svc, svctype), uid)
 
-    if min_order:
-        result = t(uid,"calc_result").format(
-            w=int(w), l=int(l), sqm=round(sqm_real,2), unit=unit_sym,
-            svc=svc_display_name(uid, svc, svctype), price=f"{price:,}".replace(","," "),
-            total=f"{total:,}".replace(","," "), min_order=min_order
-        )
+    fmt_args = dict(
+        w=int(w), l=int(l), sqm=round(sqm_real, 2), unit=unit_sym,
+        svc=svc_display_name(uid, svc, svctype),
+        price=f"{price:,}".replace(",", " "),
+        total=f"{total:,}".replace(",", " "),
+        min_order=min_order,
+    )
+    if min_order and sqm_real < min_order:
+        result = t(uid, "calc_result_below_min").format(**fmt_args)
     else:
-        result = t(uid,"calc_result_no_min").format(
-            w=int(w), l=int(l), sqm=round(sqm_real,2), unit=unit_sym,
-            svc=svc_display_name(uid, svc, svctype), price=f"{price:,}".replace(","," "),
-            total=f"{total:,}".replace(","," ")
-        )
+        result = t(uid, "calc_result_no_min").format(**fmt_args)
     await msg.answer(result, reply_markup=back_kb(uid), parse_mode="Markdown")
     await state.clear()
 
