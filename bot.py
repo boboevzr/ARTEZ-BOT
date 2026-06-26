@@ -1553,7 +1553,11 @@ async def order_phone_use_saved(cb: CallbackQuery, state: FSMContext):
 @dp.callback_query(OrderForm.phone, F.data == "phone_enter_other")
 async def order_phone_enter_other(cb: CallbackQuery, state: FSMContext):
     uid = cb.from_user.id
-    await cb.message.edit_reply_markup(reply_markup=None)
+    await cb.answer()
+    try:
+        await cb.message.edit_reply_markup(reply_markup=None)
+    except Exception:
+        pass
     await cb.message.answer(t(uid, "ask_phone"), reply_markup=phone_kb(uid), parse_mode="Markdown")
 
 # Клиент нажал «Поделиться номером» — Telegram прислал contact
@@ -1593,7 +1597,7 @@ async def order_phone_text(msg: Message, state: FSMContext):
     if not PHONE_RE.match(raw):
         await msg.answer(t(uid,"phone_invalid"), parse_mode="Markdown")
         return
-    user_data_db[uid]["phone"] = raw
+    user_data_db.setdefault(uid, {})["phone"] = raw
     await state.set_state(OrderForm.branch)
     await msg.answer("✅", reply_markup=ReplyKeyboardRemove())
     await msg.answer(t(uid,"ask_branch"), reply_markup=branch_kb(uid))
