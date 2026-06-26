@@ -24,7 +24,8 @@ ADMIN_ID    = int(os.getenv("ADMIN_ID") or "624826036")       # ваш личн�
 GROUP_ID           = int(os.getenv("GROUP_ID") or "-5211502458")      # группа сотрудников (заявки)
 GROUP_ID_ZARAFSHAN = int(os.getenv("GROUP_ID_ZARAFSHAN") or "0")        # группа Зарафшан
 GROUP_ID_NAVOI     = int(os.getenv("GROUP_ID_NAVOI") or "0")            # группа Навои
-GROUP_SMS_ID       = int(os.getenv("GROUP_SMS_ID") or "-5303335722")    # группа сообщений от клиентов
+GROUP_SMS_ID           = int(os.getenv("GROUP_SMS_ID") or "-5303335722")    # группа сообщений от клиентов
+GROUP_NEW_CLIENTS_ID   = int(os.getenv("GROUP_NEW_CLIENTS_ID") or "0")        # группа новых клиентов
 SHEETS_URL  = os.getenv("SHEETS_URL", "https://script.google.com/macros/s/AKfycbyU5a3pMuTFme3dBNEgu46qzA1sN1Ekw-Q7p39F1Pg872lnnXZEFhJPjuc4TzZNHlpObQ/exec")
 WEBSITE_URL = os.getenv("WEBSITE_URL", "https://artez.uz")
 API_URL     = os.getenv("API_URL", "https://artez-api-production.up.railway.app/api")
@@ -794,6 +795,24 @@ def _group_id_for_branch(branch: str) -> int:
     if branch == "navoi" and GROUP_ID_NAVOI:
         return GROUP_ID_NAVOI
     return GROUP_ID
+
+async def _notify_new_bot_client(uid: int, first_name: str, last_name: str, phone: str, username: str):
+    """Уведомление о новом клиенте из бота в группу новых клиентов."""
+    if not GROUP_NEW_CLIENTS_ID:
+        return
+    from datetime import datetime
+    now = datetime.now().strftime("%d.%m.%Y %H:%M")
+    name = f"{first_name or ''} {last_name or ''}".strip() or "—"
+    tg_link = f'<a href="tg://user?id={uid}">{uid}</a>'
+    text = (
+        f"👤 {name}, 📞 <code>{phone}</code>, ✈️ {tg_link}, 🤖\n"
+        f"📅 {now}"
+    )
+    try:
+        await bot.send_message(GROUP_NEW_CLIENTS_ID, text, parse_mode="HTML")
+    except Exception as e:
+        logging.warning(f"_notify_new_bot_client error: {e}")
+
 
 async def notify_group(text: str, order_num: int = None, client_id: int = None, phone: str = None, username: str = None, location_url: str = None, branch: str = ""):
     """Отправляет заявку в группу сотрудников с кнопками действий"""
@@ -1642,6 +1661,18 @@ async def quick_phone_enter_other(cb: CallbackQuery, state: FSMContext):
         pass
     await cb.message.answer(t(uid,"quick_ask_phone"), reply_markup=phone_kb(uid), parse_mode="Markdown")
 
+async def _maybe_notify_new_client(uid: int, phone: str, user_from):
+    """Отправляет уведомление если клиент впервые даёт номер."""
+    try:
+        existing = await get_client_tg_phone(uid)
+        if not existing:
+            asyncio.create_task(_notify_new_bot_client(
+                uid, getattr(user_from, "first_name", "") or "",
+                getattr(user_from, "last_name", "") or "",
+                phone, getattr(user_from, "username", "") or ""))
+    except Exception as e:
+        logging.warning(f"_maybe_notify_new_client error: {e}")
+
 @dp.message(QuickForm.phone, F.contact)
 async def quick_phone_contact(msg: Message, state: FSMContext):
     uid = msg.from_user.id
@@ -1650,6 +1681,7 @@ async def quick_phone_contact(msg: Message, state: FSMContext):
     if not norm:
         await msg.answer(t(uid,"phone_invalid"), reply_markup=phone_kb(uid), parse_mode="Markdown")
         return
+    await _maybe_notify_new_client(uid, norm, msg.from_user)
     user_data_db.setdefault(uid, {})["phone"] = norm
     await state.set_state(QuickForm.branch)
     await msg.answer("✅", reply_markup=ReplyKeyboardRemove())
@@ -1666,6 +1698,7 @@ async def quick_phone_text(msg: Message, state: FSMContext):
     if not norm:
         await msg.answer(t(uid,"phone_invalid"), reply_markup=phone_kb(uid), parse_mode="Markdown")
         return
+    await _maybe_notify_new_client(uid, norm, msg.from_user)
     user_data_db.setdefault(uid, {})["phone"] = norm
     await state.set_state(QuickForm.branch)
     await msg.answer("✅", reply_markup=ReplyKeyboardRemove())
@@ -1766,9 +1799,9 @@ async def order_phone_contact(msg: Message, state: FSMContext):
     phone = msg.contact.phone_number
     if not phone.startswith("+"):
         phone = "+" + phone
+    await _maybe_notify_new_client(uid, phone, msg.from_user)
     user_data_db[uid]["phone"] = phone
     await state.set_state(OrderForm.branch)
-    # Убираем ReplyKeyboard
     await msg.answer("✅", reply_markup=ReplyKeyboardRemove())
     await msg.answer(t(uid,"ask_branch"), reply_markup=branch_kb(uid))
 
@@ -1796,6 +1829,7 @@ async def order_phone_text(msg: Message, state: FSMContext):
     if not PHONE_RE.match(raw):
         await msg.answer(t(uid,"phone_invalid"), parse_mode="Markdown")
         return
+    await _maybe_notify_new_client(uid, raw, msg.from_user)
     user_data_db.setdefault(uid, {})["phone"] = raw
     await state.set_state(OrderForm.branch)
     await msg.answer("✅", reply_markup=ReplyKeyboardRemove())
