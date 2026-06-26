@@ -642,14 +642,11 @@ def menu_kb(uid):
     rows = [
         [InlineKeyboardButton(text=t(uid,"btn_webapp"), web_app=WebAppInfo(url=WEBSITE_URL))],
         [InlineKeyboardButton(text=t(uid,"btn_order"),    callback_data="menu_order"),
-         InlineKeyboardButton(text=t(uid,"btn_calc"),     callback_data="menu_calc")],
-        [InlineKeyboardButton(text=t(uid,"btn_prices"),   callback_data="menu_prices"),
-         InlineKeyboardButton(text=t(uid,"btn_settings"), callback_data="menu_settings")],
-        [InlineKeyboardButton(text=t(uid,"btn_promo"),    callback_data="menu_promo"),
          InlineKeyboardButton(text=t(uid,"btn_status"),   callback_data="menu_status")],
-        [InlineKeyboardButton(text=t(uid,"btn_operator"), callback_data="menu_operator"),
-         InlineKeyboardButton(text=t(uid,"btn_info"),     callback_data="menu_info")],
-        [InlineKeyboardButton(text=t(uid,"btn_profile"),  callback_data="menu_profile")],
+        [InlineKeyboardButton(text=t(uid,"btn_prices"),   callback_data="menu_prices"),
+         InlineKeyboardButton(text=t(uid,"btn_calc"),     callback_data="menu_calc")],
+        [InlineKeyboardButton(text=t(uid,"btn_profile"),  callback_data="menu_profile"),
+         InlineKeyboardButton(text=t(uid,"btn_operator"), callback_data="menu_operator")],
     ]
     return InlineKeyboardMarkup(inline_keyboard=rows)
 
@@ -1366,6 +1363,7 @@ async def menu_profile(cb: CallbackQuery):
         kb_rows.append([InlineKeyboardButton(text="✅ Агент ARTEZ", url="https://artez.uz/staff.html")])
     else:
         kb_rows.append([InlineKeyboardButton(text="🤝 Стать Агентом", callback_data="menu_agent")])
+    kb_rows.append([InlineKeyboardButton(text=t(uid,"btn_settings"), callback_data="menu_settings")])
     kb_rows.append([InlineKeyboardButton(text=t(uid,"btn_menu"), callback_data="go_menu")])
     await cb.message.answer(text, reply_markup=InlineKeyboardMarkup(inline_keyboard=kb_rows), parse_mode="Markdown")
 
