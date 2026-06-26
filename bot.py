@@ -236,7 +236,7 @@ T = {
         "status_btn_progress":  "🔄 В работе",
         "status_btn_done":      "✅ Выполнено",
         "status_btn_cancelled": "❌ Отказано",
-        "status_empty":   "📦 *Статус заказа*\n\nУ вас пока нет заявок.\n\nОформить заявку: /order",
+        "status_empty":   "📦 *Статус заказа*\n\nУ вас пока нет заявок.",
         "status_group_empty": "В этой категории заявок нет.",
         "status_order_line":  "📋 *{num}*\n🧺 {service}\n📅 {date}\n📍 Статус: {status}",
         "btn_back_to_status": "◀️ К категориям",
@@ -356,7 +356,7 @@ T = {
         "status_btn_progress":  "🔄 Bajarilmoqda",
         "status_btn_done":      "✅ Bajarildi",
         "status_btn_cancelled": "❌ Bekor qilindi",
-        "status_empty":   "📦 *Buyurtma holati*\n\nSizda hali buyurtmalar yo'q.\n\nBuyurtma berish: /order",
+        "status_empty":   "📦 *Buyurtma holati*\n\nSizda hali buyurtmalar yo'q.",
         "status_group_empty": "Bu kategoriyada buyurtmalar yo'q.",
         "status_order_line":  "📋 *{num}*\n🧺 {service}\n📅 {date}\n📍 Holat: {status}",
         "btn_back_to_status": "◀️ Kategoriyalarga",
@@ -1324,7 +1324,11 @@ async def menu_status(cb: CallbackQuery):
                 break
 
     if not orders:
-        await cb.message.answer(t(uid,"status_empty"), reply_markup=back_kb(uid), parse_mode="Markdown")
+        kb_empty = InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text=t(uid,"btn_order"), callback_data="menu_order")],
+            [InlineKeyboardButton(text=t(uid,"btn_menu"),  callback_data="go_menu")],
+        ])
+        await cb.message.answer(t(uid,"status_empty"), reply_markup=kb_empty, parse_mode="Markdown")
         return
 
     await cb.message.answer(t(uid,"status_menu_title"), reply_markup=status_menu_kb(uid, counts), parse_mode="Markdown")
