@@ -1480,10 +1480,15 @@ async def admin_reply_send(msg: Message, state: FSMContext):
     sname     = f"{sender.first_name or ''} {sender.last_name or ''}".strip()
 
     try:
+        btn_label = "✍️ Yozish" if lang(client_id) == "uz" else "✍️ Написать оператору"
+        client_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text=btn_label, callback_data="menu_operator")
+        ]])
         await bot.send_message(
             client_id,
             f"📩 *Сообщение от оператора ARTEZ*\n\n{md_escape(msg.text)}",
-            parse_mode="Markdown"
+            parse_mode="Markdown",
+            reply_markup=client_kb
         )
         await msg.answer(
             f"✅ Ответ отправлен клиенту `{client_id}`",
