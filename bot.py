@@ -2354,12 +2354,9 @@ async def route_pickup_cb(cb: CallbackQuery):
         await update_order_status_by_id(order_id, new_status, by_tg_id=w.id, by_name=wname,
                                         note=f"Маршрут: {toast}")
 
-        orig = cb.message.text or ""
-        parts_t = orig.rsplit("📌 Статус:", 1)
-        new_text = (parts_t[0] + "📌 Статус: " + _ROUTE_STATUS_RU.get(new_status, new_status)
-                    if len(parts_t) == 2 else orig)
-
-        await cb.message.edit_text(new_text, reply_markup=_route_pickup_kb(order_id, new_status))
+        orig = cb.message.html_text or cb.message.text or ""
+        await cb.message.edit_text(orig, reply_markup=_route_pickup_kb(order_id, new_status),
+                                   parse_mode="HTML", disable_web_page_preview=True)
         await cb.answer(toast)
 
     except Exception as e:
