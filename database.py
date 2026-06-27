@@ -439,6 +439,28 @@ async def get_order_activity_by_id(order_id: int) -> list:
         return [dict(r) for r in rows]
 
 
+async def set_route_stop_status(order_id: int, status: str) -> bool:
+    """Ставит stop_status (pending/done/skipped) для последней точки маршрута заказа."""
+    if not pool: return False
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow(
+            "SELECT route_id FROM route_orders WHERE order_id=$1 ORDER BY id DESC LIMIT 1", order_id)
+        if not row: return False
+        await conn.execute(
+            "UPDATE route_orders SET stop_status=$1 WHERE route_id=$2 AND order_id=$3",
+            status, row["route_id"], order_id)
+        return True
+
+
+async def add_order_activity(order_id: int, action: str, details: str, staff_name: str = "Водитель (TG)"):
+    """Запись в историю заказа без смены статуса."""
+    if not pool: return
+    async with pool.acquire() as conn:
+        await conn.execute(
+            "INSERT INTO order_activity (order_id, staff_name, action, details) VALUES ($1,$2,$3,$4)",
+            order_id, staff_name, action, details)
+
+
 async def get_route_delivery_info(order_id: int):
     """Возвращает (branch, msg_ids_dict) маршрута содержащего этот заказ."""
     if not pool: return None, {}

@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id, get_order_activity_by_id, get_route_delivery_info, get_prices_for_services, create_pickup_items, delete_order_items
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id, get_order_activity_by_id, get_route_delivery_info, get_prices_for_services, create_pickup_items, delete_order_items, set_route_stop_status, add_order_activity
 
 logging.basicConfig(level=logging.INFO)
 
@@ -2357,11 +2357,34 @@ def _history_nav_kb(order_id: int, page: int, total: int) -> InlineKeyboardMarku
         [InlineKeyboardButton(text="✖ Закрыть историю", callback_data=f"rp:{order_id}:history:close")],
     ])
 
+# Причины пропуска точки маршрута (skip)
+_SKIP_REASONS = [
+    ("no_client",  "🚪 Клиента не было"),
+    ("refused",    "🚫 Отказался"),
+    ("reschedule", "📅 Перенос"),
+    ("no_answer",  "📵 Не дозвонился"),
+    ("wrong_addr", "📍 Неверный адрес"),
+    ("other",      "✏️ Другое"),
+]
+
+def _skip_reason_kb(order_id: int) -> InlineKeyboardMarkup:
+    rows = [[InlineKeyboardButton(text=label, callback_data=f"rp:{order_id}:skipr:{i}")]
+            for i, (_, label) in enumerate(_SKIP_REASONS)]
+    rows.append([InlineKeyboardButton(text="↩️ Отмена", callback_data=f"rp:{order_id}:skipcancel")])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def _skipped_kb(order_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text="↩️ Отменить пропуск", callback_data=f"rp:{order_id}:unskip")],
+        [InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")],
+    ])
+
 def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
     h = InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
     if status == "confirmed":
         return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Забрал", callback_data=f"rp:{order_id}:take")],
+            [InlineKeyboardButton(text="✅ Забрал", callback_data=f"rp:{order_id}:take"),
+             InlineKeyboardButton(text="⏭ Пропустить", callback_data=f"rp:{order_id}:skip")],
             [h],
         ])
     elif status == "pickup":
@@ -2496,6 +2519,45 @@ async def route_pickup_cb(cb: CallbackQuery):
             await cb.answer("Выберите тип изделий")
             return
 
+        # ── Пропустить точку маршрута: показать причины ─────────────
+        if action == "skip":
+            if cur != "confirmed":
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            await cb.message.edit_reply_markup(reply_markup=_skip_reason_kb(order_id))
+            await cb.answer("Выберите причину пропуска")
+            return
+
+        if action == "skipcancel":
+            await cb.message.edit_reply_markup(reply_markup=_route_pickup_kb(order_id, cur))
+            await cb.answer("↩️ Отменено")
+            return
+
+        # ── Причина выбрана → stop_status=skipped + запись в историю ─
+        if action == "skipr":
+            if cur != "confirmed":
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            idx = int(parts[3]) if len(parts) > 3 and parts[3].isdigit() else -1
+            if idx < 0 or idx >= len(_SKIP_REASONS):
+                await cb.answer("❌ Причина не найдена", show_alert=True)
+                return
+            reason = _SKIP_REASONS[idx][1]
+            await set_route_stop_status(order_id, "skipped")
+            await add_order_activity(order_id, "route_skip", f"⏭ Пропущено: {reason}",
+                                     staff_name=wname or "Водитель (TG)")
+            await cb.message.edit_reply_markup(reply_markup=_skipped_kb(order_id))
+            await cb.answer(f"⏭ Пропущено: {reason}")
+            return
+
+        if action == "unskip":
+            await set_route_stop_status(order_id, "pending")
+            await add_order_activity(order_id, "route_unskip", "↩️ Пропуск отменён",
+                                     staff_name=wname or "Водитель (TG)")
+            await cb.message.edit_reply_markup(reply_markup=_route_pickup_kb(order_id, cur))
+            await cb.answer("↩️ Пропуск отменён")
+            return
+
         if action == "svc":
             sub = parts[3] if len(parts) > 3 else None
             if sub and sub.isdigit():
@@ -2534,6 +2596,7 @@ async def route_pickup_cb(cb: CallbackQuery):
             note = ", ".join(f"{_PICKUP_SVCS[i][1]}:{q}" for i, q in cart.items())
             await update_order_status_by_id(order_id, "pickup", by_tg_id=w.id, by_name=wname,
                                             note=f"Забрал: {note}")
+            await set_route_stop_status(order_id, "done")
             await cb.message.edit_reply_markup(reply_markup=_route_pickup_kb(order_id, "pickup"))
             await cb.answer(f"✅ Забрал {sum(cart.values())} изд. → Вывоз")
             return
@@ -2564,6 +2627,7 @@ async def route_pickup_cb(cb: CallbackQuery):
             await delete_order_items(order_id)
             await update_order_status_by_id(order_id, "confirmed", by_tg_id=w.id, by_name=wname,
                                             note="Маршрут: не забирал — позиции удалены")
+            await set_route_stop_status(order_id, "pending")
             await cb.message.edit_text(orig, reply_markup=_route_pickup_kb(order_id, "confirmed"),
                                        parse_mode="HTML", disable_web_page_preview=True)
             await cb.answer("↩️ Не забирал — позиции удалены")
