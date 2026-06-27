@@ -378,6 +378,25 @@ async def get_order(order_num: str):
         return await conn.fetchrow("SELECT * FROM orders WHERE order_num=$1", order_num)
 
 
+async def get_order_by_id(order_id: int):
+    if not pool: return None
+    async with pool.acquire() as conn:
+        return await conn.fetchrow("SELECT * FROM orders WHERE id=$1", order_id)
+
+
+async def update_order_status_by_id(order_id: int, new_status: str, by_tg_id=None, by_name=None, note=None):
+    if not pool: return
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("SELECT order_num, status FROM orders WHERE id=$1", order_id)
+        if not row: return
+        old_status = row["status"]
+        await conn.execute("UPDATE orders SET status=$1 WHERE id=$2", new_status, order_id)
+        await conn.execute("""
+            INSERT INTO order_activity (order_num, old_status, new_status, changed_by_tg_id, changed_by_name, note)
+            VALUES ($1,$2,$3,$4,$5,$6)
+        """, row["order_num"], old_status, new_status, by_tg_id, by_name, note)
+
+
 async def get_orders_by_status(status: str, branch: str = None):
     if not pool: return []
     async with pool.acquire() as conn:

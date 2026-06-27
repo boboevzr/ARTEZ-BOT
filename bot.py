@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id
 
 logging.basicConfig(level=logging.INFO)
 
@@ -2297,6 +2297,76 @@ async def group_reject(cb: CallbackQuery):
     except Exception as e:
         logging.warning(f"Client notify error: {e}")
     await cb.answer(f"Заказ {order_num} отклонён")
+
+# ── МАРШРУТ: ВОДИТЕЛЬ ЗАБИРАЕТ / СДАЁТ (rp:) ──
+_ROUTE_STATUS_RU = {
+    "confirmed": "Подтверждён", "pickup": "Вывоз", "received": "В мастерской",
+    "ready": "Готов", "delivery": "Доставка", "delivered": "Доставлен",
+}
+
+def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
+    if status == "confirmed":
+        return InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="✅ Забрал", callback_data=f"rp:{order_id}:take")
+        ]])
+    elif status == "pickup":
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="🏭 Сдал в мастерскую", callback_data=f"rp:{order_id}:deliver")],
+            [InlineKeyboardButton(text="↩️ Не забирал (отменить)", callback_data=f"rp:{order_id}:undo")],
+        ])
+    return InlineKeyboardMarkup(inline_keyboard=[])
+
+@dp.callback_query(F.data.startswith("rp:"))
+async def route_pickup_cb(cb: CallbackQuery):
+    try:
+        parts    = cb.data.split(":")
+        order_id = int(parts[1])
+        action   = parts[2]
+
+        order = await get_order_by_id(order_id)
+        if not order:
+            await cb.answer("❌ Заказ не найден", show_alert=True)
+            return
+
+        cur = order["status"]
+        w = cb.from_user
+        wname = f"{w.first_name or ''} {w.last_name or ''}".strip()
+
+        if action == "take":
+            if cur != "confirmed":
+                await cb.answer(f"ℹ️ Статус уже: {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            new_status, toast = "pickup", "✅ Забрал — статус: Вывоз"
+        elif action == "undo":
+            if cur != "pickup":
+                await cb.answer(f"ℹ️ Статус уже: {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            new_status, toast = "confirmed", "↩️ Отменено — статус: Подтверждён"
+        elif action == "deliver":
+            if cur != "pickup":
+                await cb.answer(f"ℹ️ Статус уже: {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            new_status, toast = "received", "🏭 Сдан в мастерскую"
+        else:
+            await cb.answer()
+            return
+
+        await update_order_status_by_id(order_id, new_status, by_tg_id=w.id, by_name=wname,
+                                        note=f"Маршрут: {toast}")
+
+        orig = cb.message.text or ""
+        parts_t = orig.rsplit("📌 Статус:", 1)
+        new_text = (parts_t[0] + "📌 Статус: " + _ROUTE_STATUS_RU.get(new_status, new_status)
+                    if len(parts_t) == 2 else orig)
+
+        await cb.message.edit_text(new_text, reply_markup=_route_pickup_kb(order_id, new_status))
+        await cb.answer(toast)
+
+    except Exception as e:
+        logging.warning(f"route_pickup_cb error: {e}")
+        try: await cb.answer("❌ Ошибка сервера", show_alert=True)
+        except Exception: pass
+
 
 # ── КОМАНДЫ ──
 @dp.message(Command("order"))
