@@ -398,6 +398,31 @@ async def update_order_status_by_id(order_id: int, new_status: str, by_tg_id=Non
             f"{old_status} → {new_status}" + (f": {note}" if note else ""))
 
 
+async def get_prices_for_services(service_keys: list, type_key: str) -> dict:
+    """Возвращает {service_key: price_int} из таблицы prices."""
+    if not pool: return {}
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT service_key, price FROM prices WHERE service_key = ANY($1::varchar[]) AND type_key=$2",
+            service_keys, type_key)
+        return {r["service_key"]: float(r["price"]) for r in rows}
+
+
+async def create_pickup_items(order_id: int, service_items: list, price_map: dict) -> int:
+    """Создаёт позиции: service_items = [(service_key, qty, label)]."""
+    if not pool or not service_items: return 0
+    count = 0
+    async with pool.acquire() as conn:
+        for svc_key, qty, label in service_items:
+            price = price_map.get(svc_key, 0)
+            for _ in range(qty):
+                await conn.execute(
+                    "INSERT INTO order_items (order_id, service, sqm, price_per_sqm) VALUES ($1, $2, 0, $3)",
+                    order_id, label, price)
+                count += 1
+    return count
+
+
 async def get_order_activity_by_id(order_id: int) -> list:
     if not pool: return []
     async with pool.acquire() as conn:

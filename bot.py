@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id, get_order_activity_by_id, get_route_delivery_info
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id, get_order_activity_by_id, get_route_delivery_info, get_prices_for_services, create_pickup_items
 
 logging.basicConfig(level=logging.INFO)
 
@@ -2304,7 +2304,14 @@ _ROUTE_STATUS_RU = {
     "washing": "Стирка", "ready": "Готов", "delivery": "Доставка", "delivered": "Доставлен",
 }
 _STAFF_CONFIRM_ROLES = {"admin", "manager"}
-_QTY_SEP = "\n\n<b>📦 Сколько изделий забрали?</b>"
+_PICKUP_SVCS = [                          # (service_key, emoji_label)
+    ("carpet",      "🏠 Ковёр"),
+    ("carpet_home", "🏡 Ковёр (на дому)"),
+    ("sofa",        "🛋 Диван"),
+    ("mattress",    "🛏 Матрас"),
+    ("curtains",    "🪟 Шторы"),
+]
+_pickup_carts: dict = {}                  # {(user_id, order_id): {svc_idx: qty}}
 
 def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
     if status == "confirmed":
@@ -2316,23 +2323,47 @@ def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="🏭 Сдал в мастерскую", callback_data=f"rp:{order_id}:deliver")],
             [InlineKeyboardButton(text="↩️ Не забирал", callback_data=f"rp:{order_id}:undo")],
         ])
-    elif status == "received":
-        return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="✅ Подтвердить приём", callback_data=f"rp:{order_id}:confirm_receive")],
-            [InlineKeyboardButton(text="↩️ Не сдавал", callback_data=f"rp:{order_id}:undo_deliver"),
-             InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")],
-        ])
     else:
         return InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
         ]])
 
-def _qty_kb(order_id: int) -> InlineKeyboardMarkup:
+def _deliver_pending_kb(order_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text=str(n), callback_data=f"rp:{order_id}:qty:{n}") for n in range(1, 6)],
-        [InlineKeyboardButton(text=str(n), callback_data=f"rp:{order_id}:qty:{n}") for n in range(6, 11)],
-        [InlineKeyboardButton(text="↩️ Отменить", callback_data=f"rp:{order_id}:qty:0")],
+        [InlineKeyboardButton(text="✅ Подтвердить приём", callback_data=f"rp:{order_id}:confirm_receive")],
+        [InlineKeyboardButton(text="↩️ Не сдавал", callback_data=f"rp:{order_id}:undo_deliver"),
+         InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")],
     ])
+
+def _svc_kb(order_id: int, user_id: int) -> InlineKeyboardMarkup:
+    cart  = _pickup_carts.get((user_id, order_id), {})
+    total = sum(cart.values())
+    rows, row = [], []
+    for i, (_, label) in enumerate(_PICKUP_SVCS):
+        qty  = cart.get(i, 0)
+        text = f"{label} ✓{qty}" if qty > 0 else label
+        row.append(InlineKeyboardButton(text=text, callback_data=f"rp:{order_id}:svc:{i}"))
+        if len(row) == 2:
+            rows.append(row); row = []
+    if row: rows.append(row)
+    bottom = [InlineKeyboardButton(text="↩️ Отменить", callback_data=f"rp:{order_id}:undo")]
+    if total > 0:
+        bottom.append(InlineKeyboardButton(
+            text=f"✅ Подтвердить ({total} изд.)", callback_data=f"rp:{order_id}:sconfirm"))
+    rows.append(bottom)
+    return InlineKeyboardMarkup(inline_keyboard=rows)
+
+def _sqty_kb(order_id: int, svc_idx: int) -> InlineKeyboardMarkup:
+    rows = [
+        [InlineKeyboardButton(text=str(n), callback_data=f"rp:{order_id}:sqty:{svc_idx}:{n}")
+         for n in range(s, min(s + 5, 21))]
+        for s in range(1, 21, 5)
+    ]
+    rows.append([
+        InlineKeyboardButton(text="← Назад", callback_data=f"rp:{order_id}:svc"),
+        InlineKeyboardButton(text="✖ Убрать",  callback_data=f"rp:{order_id}:sqty:{svc_idx}:0"),
+    ])
+    return InlineKeyboardMarkup(inline_keyboard=rows)
 
 @dp.callback_query(F.data.startswith("rp:"))
 async def route_pickup_cb(cb: CallbackQuery):
@@ -2351,88 +2382,116 @@ async def route_pickup_cb(cb: CallbackQuery):
         wname = f"{w.first_name or ''} {w.last_name or ''}".strip()
         orig  = cb.message.html_text or cb.message.text or ""
 
-        # ── История ──────────────────────────────────────────────────
+        # ── История ─────────────────────────────────────────────────
         if action == "history":
             activity = await get_order_activity_by_id(order_id)
             lines = [f"📦 {order.get('order_num','')}"]
             for a in activity[-8:]:
                 t = str(a.get("created_at",""))[:16].replace("T"," ")
                 d = a.get("details","") or a.get("action","")
-                for k,v in _ROUTE_STATUS_RU.items(): d = d.replace(k, v)
+                for k, v in _ROUTE_STATUS_RU.items(): d = d.replace(k, v)
                 lines.append(f"{t} {d}")
             await cb.answer("\n".join(lines)[:200], show_alert=True)
             return
 
-        # ── Выбор количества изделий ─────────────────────────────────
-        if action == "qty":
-            qty = int(parts[3]) if len(parts) > 3 else 0
-            clean = orig.split(_QTY_SEP)[0] if _QTY_SEP in orig else orig
-            if qty == 0:
-                await cb.message.edit_text(clean, reply_markup=_route_pickup_kb(order_id, "confirmed"),
-                                           parse_mode="HTML", disable_web_page_preview=True)
-                await cb.answer("Отменено")
-                return
-            await update_order_status_by_id(order_id, "pickup", by_tg_id=w.id, by_name=wname,
-                                            note=f"Забрал {qty} изд.")
-            await cb.message.edit_text(clean, reply_markup=_route_pickup_kb(order_id, "pickup"),
-                                       parse_mode="HTML", disable_web_page_preview=True)
-            await cb.answer(f"✅ Забрал {qty} изделий")
-            return
-
-        # ── Подтвердить приём (только admin/manager) ─────────────────
+        # ── Подтвердить приём (только admin/manager) ────────────────
         if action == "confirm_receive":
             staff = await get_staff_by_tg_id_for_lead(w.id)
             if not staff or staff.get("role") not in _STAFF_CONFIRM_ROLES:
-                await cb.answer("❌ Доступно только менеджерам и администраторам", show_alert=True)
+                await cb.answer("❌ Только менеджеры и администраторы", show_alert=True)
                 return
             staff_name = f"{staff.get('first_name','')} {staff.get('last_name','')}".strip() or wname
-            await update_order_status_by_id(order_id, "washing", by_tg_id=w.id, by_name=staff_name,
+            await update_order_status_by_id(order_id, "received", by_tg_id=w.id, by_name=staff_name,
                                             note="Подтверждён приём в мастерской")
-            final_kb = InlineKeyboardMarkup(inline_keyboard=[[
+            await cb.message.edit_reply_markup(reply_markup=InlineKeyboardMarkup(inline_keyboard=[[
                 InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
-            ]])
-            await cb.message.edit_reply_markup(reply_markup=final_kb)
-            await cb.answer(f"✅ Принято! Статус → Стирка")
+            ]]))
+            await cb.answer("✅ Принято! Статус → В мастерской")
             return
 
-        # ── Статусные действия водителя ───────────────────────────────
+        # ── Выбор типа услуги (после «Забрал») ──────────────────────
         if action == "take":
             if cur != "confirmed":
                 await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
                 return
-            qty_text = orig + _QTY_SEP
-            await cb.message.edit_text(qty_text, reply_markup=_qty_kb(order_id),
+            _pickup_carts[(w.id, order_id)] = {}
+            await cb.message.edit_reply_markup(reply_markup=_svc_kb(order_id, w.id))
+            await cb.answer("Выберите тип изделий")
+            return
+
+        if action == "svc":
+            sub = parts[3] if len(parts) > 3 else None
+            if sub and sub.isdigit():
+                await cb.message.edit_reply_markup(reply_markup=_sqty_kb(order_id, int(sub)))
+                await cb.answer(f"Кол-во: {_PICKUP_SVCS[int(sub)][1]}")
+            else:
+                await cb.message.edit_reply_markup(reply_markup=_svc_kb(order_id, w.id))
+                await cb.answer()
+            return
+
+        if action == "sqty":
+            svc_idx = int(parts[3])
+            qty     = int(parts[4])
+            cart    = _pickup_carts.setdefault((w.id, order_id), {})
+            if qty == 0:
+                cart.pop(svc_idx, None)
+                await cb.answer("Убрано")
+            else:
+                cart[svc_idx] = qty
+                await cb.answer(f"{_PICKUP_SVCS[svc_idx][1]}: {qty}")
+            await cb.message.edit_reply_markup(reply_markup=_svc_kb(order_id, w.id))
+            return
+
+        if action == "sconfirm":
+            cart = _pickup_carts.pop((w.id, order_id), {})
+            if not cart:
+                await cb.answer("❌ Выберите хотя бы один тип изделий", show_alert=True)
+                return
+            service_type = order.get("service_type") or "standard"
+            type_label   = "Экспресс" if service_type == "express" else "Стандарт"
+            svc_keys     = [_PICKUP_SVCS[i][0] for i in cart]
+            price_map    = await get_prices_for_services(svc_keys, service_type)
+            items = [(_PICKUP_SVCS[i][0], qty, f"{_PICKUP_SVCS[i][1]} ({type_label})")
+                     for i, qty in cart.items()]
+            await create_pickup_items(order_id, items, price_map)
+            note = ", ".join(f"{_PICKUP_SVCS[i][1]}:{q}" for i, q in cart.items())
+            await update_order_status_by_id(order_id, "pickup", by_tg_id=w.id, by_name=wname,
+                                            note=f"Забрал: {note}")
+            await cb.message.edit_reply_markup(reply_markup=_route_pickup_kb(order_id, "pickup"))
+            await cb.answer(f"✅ Забрал {sum(cart.values())} изд. → Вывоз")
+            return
+
+        # ── «Сдал» — показываем кнопки подтверждения (статус не меняем) ─
+        if action == "deliver":
+            if cur != "pickup":
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            await cb.message.edit_reply_markup(reply_markup=_deliver_pending_kb(order_id))
+            await cb.answer("🏭 Ожидает подтверждения менеджера")
+            return
+
+        if action == "undo_deliver":
+            await cb.message.edit_reply_markup(reply_markup=_route_pickup_kb(order_id, "pickup"))
+            await cb.answer("↩️ Отменено")
+            return
+
+        if action == "undo":
+            if cur == "confirmed":
+                _pickup_carts.pop((w.id, order_id), None)
+                await cb.message.edit_reply_markup(reply_markup=_route_pickup_kb(order_id, "confirmed"))
+                await cb.answer("Отменено")
+                return
+            if cur != "pickup":
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            await update_order_status_by_id(order_id, "confirmed", by_tg_id=w.id, by_name=wname,
+                                            note="Маршрут: не забирал")
+            await cb.message.edit_text(orig, reply_markup=_route_pickup_kb(order_id, "confirmed"),
                                        parse_mode="HTML", disable_web_page_preview=True)
-            await cb.answer("Укажите количество изделий")
+            await cb.answer("↩️ Не забирал — отменено")
             return
 
-        elif action == "undo":
-            if cur != "pickup":
-                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
-                return
-            new_status, toast = "confirmed", "↩️ Не забирал — отменено"
-
-        elif action == "deliver":
-            if cur != "pickup":
-                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
-                return
-            new_status, toast = "received", "🏭 Сдан в мастерскую"
-
-        elif action == "undo_deliver":
-            if cur != "received":
-                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
-                return
-            new_status, toast = "pickup", "↩️ Не сдавал — отменено"
-
-        else:
-            await cb.answer()
-            return
-
-        await update_order_status_by_id(order_id, new_status, by_tg_id=w.id, by_name=wname,
-                                        note=f"Маршрут: {toast}")
-        await cb.message.edit_text(orig, reply_markup=_route_pickup_kb(order_id, new_status),
-                                   parse_mode="HTML", disable_web_page_preview=True)
-        await cb.answer(toast)
+        await cb.answer()
 
     except Exception as e:
         logging.warning(f"route_pickup_cb error: {e}")
