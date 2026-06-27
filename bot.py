@@ -2313,6 +2313,50 @@ _PICKUP_SVCS = [                          # (service_key, emoji_label)
 ]
 _pickup_carts: dict = {}                  # {(user_id, order_id): {svc_idx: qty}}
 
+_history_orig: dict = {}   # {(chat_id, msg_id): (html_text, status)}
+
+def _history_fmt(activity: list, order_num: str) -> list:
+    """Возвращает список строк-страниц истории (по 4 записи)."""
+    from datetime import timezone, timedelta
+    UZ = timezone(timedelta(hours=5))
+    PER = 4
+    entries = []
+    for a in activity:
+        dt = a.get("created_at")
+        if dt and hasattr(dt, "astimezone"):
+            t = dt.astimezone(UZ).strftime("%d.%m %H:%M")
+        else:
+            t = str(dt or "")[:16].replace("T", " ")
+        d = a.get("details","") or a.get("action","")
+        for k, v in _ROUTE_STATUS_RU.items():
+            d = d.replace(k, v)
+        name = (a.get("staff_name") or "").strip()
+        if not name or name == "Водитель (TG)":
+            name = "Водитель"
+        entries.append(f"🕐 {t}\n{d}\n👤 {name}")
+    if not entries:
+        return [f"📋 {order_num}\n(история пуста)"]
+    total = (len(entries) + PER - 1) // PER
+    pages = []
+    for i in range(0, len(entries), PER):
+        pg = i // PER + 1
+        header = f"📋 {order_num}  ({pg}/{total})"
+        sep = "─" * 20
+        pages.append(header + f"\n{sep}\n" + f"\n{sep}\n".join(entries[i:i+PER]))
+    return pages
+
+def _history_nav_kb(order_id: int, page: int, total: int) -> InlineKeyboardMarkup:
+    nav = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="◀️", callback_data=f"rp:{order_id}:history:{page-1}"))
+    nav.append(InlineKeyboardButton(text=f"{page+1} / {total}", callback_data=f"rp:{order_id}:histnoop"))
+    if page < total - 1:
+        nav.append(InlineKeyboardButton(text="▶️", callback_data=f"rp:{order_id}:history:{page+1}"))
+    return InlineKeyboardMarkup(inline_keyboard=[
+        nav,
+        [InlineKeyboardButton(text="✖ Закрыть историю", callback_data=f"rp:{order_id}:history:close")],
+    ])
+
 def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
     if status == "confirmed":
         return InlineKeyboardMarkup(inline_keyboard=[[
@@ -2382,16 +2426,43 @@ async def route_pickup_cb(cb: CallbackQuery):
         wname = f"{w.first_name or ''} {w.last_name or ''}".strip()
         orig  = cb.message.html_text or cb.message.text or ""
 
-        # ── История ─────────────────────────────────────────────────
+        # ── История (с пагинацией) ──────────────────────────────────
+        if action == "histnoop":
+            await cb.answer()
+            return
+
         if action == "history":
+            page_str = parts[3] if len(parts) > 3 else "0"
+            key = (cb.message.chat.id, cb.message.message_id)
+
+            if page_str == "close":
+                saved = _history_orig.pop(key, None)
+                if saved:
+                    orig_text, orig_status = saved
+                    await cb.message.edit_text(
+                        orig_text, reply_markup=_route_pickup_kb(order_id, orig_status),
+                        parse_mode="HTML", disable_web_page_preview=True)
+                else:
+                    order2 = await get_order_by_id(order_id)
+                    st2 = (order2 or {}).get("status", "confirmed")
+                    await cb.message.edit_reply_markup(reply_markup=_route_pickup_kb(order_id, st2))
+                await cb.answer()
+                return
+
+            page = int(page_str) if page_str.isdigit() else 0
             activity = await get_order_activity_by_id(order_id)
-            lines = [f"📦 {order.get('order_num','')}"]
-            for a in activity[-8:]:
-                t = str(a.get("created_at",""))[:16].replace("T"," ")
-                d = a.get("details","") or a.get("action","")
-                for k, v in _ROUTE_STATUS_RU.items(): d = d.replace(k, v)
-                lines.append(f"{t} {d}")
-            await cb.answer("\n".join(lines)[:200], show_alert=True)
+            pages = _history_fmt(activity, order.get("order_num",""))
+            total = len(pages)
+            page  = max(0, min(page, total - 1))
+
+            if key not in _history_orig:
+                _history_orig[key] = (orig, cur)
+
+            await cb.message.edit_text(
+                pages[page],
+                reply_markup=_history_nav_kb(order_id, page, total),
+                disable_web_page_preview=True)
+            await cb.answer()
             return
 
         # ── Подтвердить приём (только admin/manager) ────────────────
