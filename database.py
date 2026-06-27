@@ -398,6 +398,34 @@ async def update_order_status_by_id(order_id: int, new_status: str, by_tg_id=Non
             f"{old_status} → {new_status}" + (f": {note}" if note else ""))
 
 
+async def get_order_activity_by_id(order_id: int) -> list:
+    if not pool: return []
+    async with pool.acquire() as conn:
+        rows = await conn.fetch(
+            "SELECT action, details, staff_name, created_at FROM order_activity WHERE order_id=$1 ORDER BY created_at",
+            order_id)
+        return [dict(r) for r in rows]
+
+
+async def get_route_delivery_info(order_id: int):
+    """Возвращает (branch, msg_ids_dict) маршрута содержащего этот заказ."""
+    if not pool: return None, {}
+    import json as _j
+    async with pool.acquire() as conn:
+        row = await conn.fetchrow("""
+            SELECT r.branch, r.tg_delivery_msg_ids
+            FROM route_orders ro
+            JOIN routes r ON r.id = ro.route_id
+            WHERE ro.order_id = $1
+            ORDER BY ro.id DESC LIMIT 1
+        """, order_id)
+        if not row: return None, {}
+        raw = row["tg_delivery_msg_ids"]
+        try: msg_ids = _j.loads(raw) if isinstance(raw, str) else (raw or {})
+        except: msg_ids = {}
+        return row["branch"], msg_ids
+
+
 async def get_orders_by_status(status: str, branch: str = None):
     if not pool: return []
     async with pool.acquire() as conn:

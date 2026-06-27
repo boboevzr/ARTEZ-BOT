@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id, get_order_activity_by_id, get_route_delivery_info
 
 logging.basicConfig(level=logging.INFO)
 
@@ -2312,9 +2312,17 @@ def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
     elif status == "pickup":
         return InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🏭 Сдал в мастерскую", callback_data=f"rp:{order_id}:deliver")],
-            [InlineKeyboardButton(text="↩️ Не забирал (отменить)", callback_data=f"rp:{order_id}:undo")],
+            [InlineKeyboardButton(text="↩️ Не забирал", callback_data=f"rp:{order_id}:undo")],
         ])
-    return InlineKeyboardMarkup(inline_keyboard=[])
+    elif status == "received":
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="↩️ Не сдавал", callback_data=f"rp:{order_id}:undo_deliver")],
+            [InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")],
+        ])
+    else:
+        return InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
+        ]])
 
 @dp.callback_query(F.data.startswith("rp:"))
 async def route_pickup_cb(cb: CallbackQuery):
@@ -2328,25 +2336,83 @@ async def route_pickup_cb(cb: CallbackQuery):
             await cb.answer("❌ Заказ не найден", show_alert=True)
             return
 
-        cur = order["status"]
-        w = cb.from_user
+        cur   = order["status"]
+        w     = cb.from_user
         wname = f"{w.first_name or ''} {w.last_name or ''}".strip()
+        orig  = cb.message.html_text or cb.message.text or ""
 
+        # ── История ──────────────────────────────────────────────────
+        if action == "history":
+            activity = await get_order_activity_by_id(order_id)
+            lines = [f"📦 {order.get('order_num','')}", "─" * 20]
+            _st = {"confirmed":"Подтверждён","pickup":"Вывоз","received":"В мастерской",
+                   "ready":"Готов","delivery":"Доставка","delivered":"Доставлен"}
+            for a in activity[-8:]:
+                t = str(a.get("created_at",""))[:16].replace("T"," ")
+                d = a.get("details","") or a.get("action","")
+                # Переводим статусы
+                for k,v in _st.items(): d = d.replace(k, v)
+                by = a.get("staff_name","") or ""
+                lines.append(f"{t}\n{d}" + (f" · {by}" if by and by != "Водитель (TG)" else ""))
+            await cb.answer("\n".join(lines)[:200], show_alert=True)
+            return
+
+        # ── Подтвердить приём (только сотрудник) ─────────────────────
+        if action == "confirm_receive":
+            staff = await get_staff_by_tg_id_for_lead(w.id)
+            if not staff:
+                await cb.answer("❌ Доступно только сотрудникам ARTEZ", show_alert=True)
+                return
+            staff_name = f"{staff.get('first_name','')} {staff.get('last_name','')}".strip() or wname
+            # Редактируем сообщение в канале — оставляем только 📋 История
+            branch, msg_ids = await get_route_delivery_info(order_id)
+            ch_key = "delivery_channel_navoi_id" if branch == "navoi" else "delivery_channel_zarafshan_id"
+            channel_id = int(SITE.get(ch_key) or "0")
+            ch_msg_id  = msg_ids.get(str(order_id))
+            if channel_id and ch_msg_id:
+                final_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                    InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
+                ]])
+                try:
+                    await bot.edit_message_reply_markup(
+                        chat_id=channel_id, message_id=int(ch_msg_id), reply_markup=final_kb)
+                except Exception as e:
+                    logging.warning(f"confirm_receive channel edit: {e}")
+            # Обновляем уведомление в группе
+            try:
+                await cb.message.edit_text(
+                    orig + f"\n✅ Подтверждено: {staff_name}",
+                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
+                    parse_mode="HTML")
+            except Exception: pass
+            await cb.answer("✅ Приём подтверждён!")
+            return
+
+        # ── Статусные действия водителя ───────────────────────────────
         if action == "take":
             if cur != "confirmed":
-                await cb.answer(f"ℹ️ Статус уже: {_ROUTE_STATUS_RU.get(cur, cur)}")
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
                 return
-            new_status, toast = "pickup", "✅ Забрал — статус: Вывоз"
+            new_status, toast = "pickup", "✅ Забрал"
+
         elif action == "undo":
             if cur != "pickup":
-                await cb.answer(f"ℹ️ Статус уже: {_ROUTE_STATUS_RU.get(cur, cur)}")
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
                 return
-            new_status, toast = "confirmed", "↩️ Отменено — статус: Подтверждён"
+            new_status, toast = "confirmed", "↩️ Не забирал — отменено"
+
         elif action == "deliver":
             if cur != "pickup":
-                await cb.answer(f"ℹ️ Статус уже: {_ROUTE_STATUS_RU.get(cur, cur)}")
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
                 return
             new_status, toast = "received", "🏭 Сдан в мастерскую"
+
+        elif action == "undo_deliver":
+            if cur != "received":
+                await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
+                return
+            new_status, toast = "pickup", "↩️ Не сдавал — отменено"
+
         else:
             await cb.answer()
             return
@@ -2354,10 +2420,29 @@ async def route_pickup_cb(cb: CallbackQuery):
         await update_order_status_by_id(order_id, new_status, by_tg_id=w.id, by_name=wname,
                                         note=f"Маршрут: {toast}")
 
-        orig = cb.message.html_text or cb.message.text or ""
         await cb.message.edit_text(orig, reply_markup=_route_pickup_kb(order_id, new_status),
                                    parse_mode="HTML", disable_web_page_preview=True)
         await cb.answer(toast)
+
+        # ── После «Сдал» — уведомить менеджеров ─────────────────────
+        if action == "deliver":
+            order_num = (order.get("order_num","") or "").replace("ARTEZ-","")
+            addr = order.get("location_address") or order.get("address","") or ""
+            notify_text = (
+                f"🏭 Водитель сдал в мастерскую\n"
+                f"📦 {order_num}" + (f" · 📍{addr}" if addr else "") + f"\n"
+                f"👤 {wname}"
+            )
+            notify_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"rp:{order_id}:confirm_receive"),
+                InlineKeyboardButton(text="↩️ Вернуть", callback_data=f"rp:{order_id}:undo_deliver"),
+            ]])
+            branch = order.get("branch","")
+            admin_group = _group_id_for_branch(branch)
+            try:
+                await bot.send_message(admin_group, notify_text, reply_markup=notify_kb)
+            except Exception as e:
+                logging.warning(f"deliver notify error: {e}")
 
     except Exception as e:
         logging.warning(f"route_pickup_cb error: {e}")
