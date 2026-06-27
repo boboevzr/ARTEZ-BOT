@@ -2313,7 +2313,7 @@ _PICKUP_SVCS = [                          # (service_key, emoji_label)
 ]
 _pickup_carts: dict = {}                  # {(user_id, order_id): {svc_idx: qty}}
 
-_history_orig: dict = {}   # {(chat_id, msg_id): (html_text, status)}
+_history_orig: dict = {}   # {(chat_id, msg_id): (html_text, status, ts)}
 
 def _history_fmt(activity: list, order_num: str) -> list:
     """Возвращает список строк-страниц истории (по 4 записи)."""
@@ -2358,19 +2358,20 @@ def _history_nav_kb(order_id: int, page: int, total: int) -> InlineKeyboardMarku
     ])
 
 def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
+    h = InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
     if status == "confirmed":
-        return InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="✅ Забрал", callback_data=f"rp:{order_id}:take")
-        ]])
+        return InlineKeyboardMarkup(inline_keyboard=[
+            [InlineKeyboardButton(text="✅ Забрал", callback_data=f"rp:{order_id}:take")],
+            [h],
+        ])
     elif status == "pickup":
         return InlineKeyboardMarkup(inline_keyboard=[
             [InlineKeyboardButton(text="🏭 Сдал в мастерскую", callback_data=f"rp:{order_id}:deliver")],
             [InlineKeyboardButton(text="↩️ Не забирал", callback_data=f"rp:{order_id}:undo")],
+            [h],
         ])
     else:
-        return InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
-        ]])
+        return InlineKeyboardMarkup(inline_keyboard=[[h]])
 
 def _deliver_pending_kb(order_id: int) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[
@@ -2438,7 +2439,7 @@ async def route_pickup_cb(cb: CallbackQuery):
             if page_str == "close":
                 saved = _history_orig.pop(key, None)
                 if saved:
-                    orig_text, orig_status = saved
+                    orig_text, orig_status = saved[0], saved[1]
                     await cb.message.edit_text(
                         orig_text, reply_markup=_route_pickup_kb(order_id, orig_status),
                         parse_mode="HTML", disable_web_page_preview=True)
@@ -2456,7 +2457,12 @@ async def route_pickup_cb(cb: CallbackQuery):
             page  = max(0, min(page, total - 1))
 
             if key not in _history_orig:
-                _history_orig[key] = (orig, cur)
+                import time as _t
+                now = _t.time()
+                # Чистим записи старше 2 часов
+                stale = [k for k, v in _history_orig.items() if now - v[2] > 7200]
+                for k in stale: del _history_orig[k]
+                _history_orig[key] = (orig, cur, now)
 
             await cb.message.edit_text(
                 pages[page],

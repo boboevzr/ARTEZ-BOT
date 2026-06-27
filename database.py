@@ -434,7 +434,7 @@ async def get_order_activity_by_id(order_id: int) -> list:
     if not pool: return []
     async with pool.acquire() as conn:
         rows = await conn.fetch(
-            "SELECT action, details, staff_name, created_at FROM order_activity WHERE order_id=$1 ORDER BY created_at",
+            "SELECT action, details, staff_name, created_at FROM order_activity WHERE order_id=$1 ORDER BY created_at DESC",
             order_id)
         return [dict(r) for r in rows]
 
