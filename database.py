@@ -408,6 +408,13 @@ async def get_prices_for_services(service_keys: list, type_key: str) -> dict:
         return {r["service_key"]: float(r["price"]) for r in rows}
 
 
+async def delete_order_items(order_id: int) -> int:
+    if not pool: return 0
+    async with pool.acquire() as conn:
+        res = await conn.execute("DELETE FROM order_items WHERE order_id=$1", order_id)
+        return int(res.split()[-1]) if res else 0
+
+
 async def create_pickup_items(order_id: int, service_items: list, price_map: dict) -> int:
     """Создаёт позиции: service_items = [(service_key, qty, label)]."""
     if not pool or not service_items: return 0

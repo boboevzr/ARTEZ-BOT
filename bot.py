@@ -15,7 +15,7 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from aiogram.fsm.storage.memory import MemoryStorage
-from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id, get_order_activity_by_id, get_route_delivery_info, get_prices_for_services, create_pickup_items
+from database import init_db, upsert_client, save_order, update_order_status, get_client_orders, get_stats, get_next_order_num, get_all_prices, get_price, add_staff, remove_staff, get_staff_by_role, get_client_lang, set_client_lang, get_all_units, get_unit, add_unit, delete_unit, upsert_crm_client, get_client_by_tg_id, update_client_tg_phone, get_client_tg_phone, get_staff_by_tg_id_for_lead, take_lead, is_client_blocked, get_order_by_id, update_order_status_by_id, get_order_activity_by_id, get_route_delivery_info, get_prices_for_services, create_pickup_items, delete_order_items
 
 logging.basicConfig(level=logging.INFO)
 
@@ -2484,11 +2484,12 @@ async def route_pickup_cb(cb: CallbackQuery):
             if cur != "pickup":
                 await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
                 return
+            await delete_order_items(order_id)
             await update_order_status_by_id(order_id, "confirmed", by_tg_id=w.id, by_name=wname,
-                                            note="Маршрут: не забирал")
+                                            note="Маршрут: не забирал — позиции удалены")
             await cb.message.edit_text(orig, reply_markup=_route_pickup_kb(order_id, "confirmed"),
                                        parse_mode="HTML", disable_web_page_preview=True)
-            await cb.answer("↩️ Не забирал — отменено")
+            await cb.answer("↩️ Не забирал — позиции удалены")
             return
 
         await cb.answer()
