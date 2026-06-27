@@ -2301,8 +2301,10 @@ async def group_reject(cb: CallbackQuery):
 # ── МАРШРУТ: ВОДИТЕЛЬ ЗАБИРАЕТ / СДАЁТ (rp:) ──
 _ROUTE_STATUS_RU = {
     "confirmed": "Подтверждён", "pickup": "Вывоз", "received": "В мастерской",
-    "ready": "Готов", "delivery": "Доставка", "delivered": "Доставлен",
+    "washing": "Стирка", "ready": "Готов", "delivery": "Доставка", "delivered": "Доставлен",
 }
+_STAFF_CONFIRM_ROLES = {"admin", "manager"}
+_QTY_SEP = "\n\n<b>📦 Сколько изделий забрали?</b>"
 
 def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
     if status == "confirmed":
@@ -2316,13 +2318,21 @@ def _route_pickup_kb(order_id: int, status: str) -> InlineKeyboardMarkup:
         ])
     elif status == "received":
         return InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="↩️ Не сдавал", callback_data=f"rp:{order_id}:undo_deliver")],
-            [InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")],
+            [InlineKeyboardButton(text="✅ Подтвердить приём", callback_data=f"rp:{order_id}:confirm_receive")],
+            [InlineKeyboardButton(text="↩️ Не сдавал", callback_data=f"rp:{order_id}:undo_deliver"),
+             InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")],
         ])
     else:
         return InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
         ]])
+
+def _qty_kb(order_id: int) -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=str(n), callback_data=f"rp:{order_id}:qty:{n}") for n in range(1, 6)],
+        [InlineKeyboardButton(text=str(n), callback_data=f"rp:{order_id}:qty:{n}") for n in range(6, 11)],
+        [InlineKeyboardButton(text="↩️ Отменить", callback_data=f"rp:{order_id}:qty:0")],
+    ])
 
 @dp.callback_query(F.data.startswith("rp:"))
 async def route_pickup_cb(cb: CallbackQuery):
@@ -2344,48 +2354,45 @@ async def route_pickup_cb(cb: CallbackQuery):
         # ── История ──────────────────────────────────────────────────
         if action == "history":
             activity = await get_order_activity_by_id(order_id)
-            lines = [f"📦 {order.get('order_num','')}", "─" * 20]
-            _st = {"confirmed":"Подтверждён","pickup":"Вывоз","received":"В мастерской",
-                   "ready":"Готов","delivery":"Доставка","delivered":"Доставлен"}
+            lines = [f"📦 {order.get('order_num','')}"]
             for a in activity[-8:]:
                 t = str(a.get("created_at",""))[:16].replace("T"," ")
                 d = a.get("details","") or a.get("action","")
-                # Переводим статусы
-                for k,v in _st.items(): d = d.replace(k, v)
-                by = a.get("staff_name","") or ""
-                lines.append(f"{t}\n{d}" + (f" · {by}" if by and by != "Водитель (TG)" else ""))
+                for k,v in _ROUTE_STATUS_RU.items(): d = d.replace(k, v)
+                lines.append(f"{t} {d}")
             await cb.answer("\n".join(lines)[:200], show_alert=True)
             return
 
-        # ── Подтвердить приём (только сотрудник) ─────────────────────
+        # ── Выбор количества изделий ─────────────────────────────────
+        if action == "qty":
+            qty = int(parts[3]) if len(parts) > 3 else 0
+            clean = orig.split(_QTY_SEP)[0] if _QTY_SEP in orig else orig
+            if qty == 0:
+                await cb.message.edit_text(clean, reply_markup=_route_pickup_kb(order_id, "confirmed"),
+                                           parse_mode="HTML", disable_web_page_preview=True)
+                await cb.answer("Отменено")
+                return
+            await update_order_status_by_id(order_id, "pickup", by_tg_id=w.id, by_name=wname,
+                                            note=f"Забрал {qty} изд.")
+            await cb.message.edit_text(clean, reply_markup=_route_pickup_kb(order_id, "pickup"),
+                                       parse_mode="HTML", disable_web_page_preview=True)
+            await cb.answer(f"✅ Забрал {qty} изделий")
+            return
+
+        # ── Подтвердить приём (только admin/manager) ─────────────────
         if action == "confirm_receive":
             staff = await get_staff_by_tg_id_for_lead(w.id)
-            if not staff:
-                await cb.answer("❌ Доступно только сотрудникам ARTEZ", show_alert=True)
+            if not staff or staff.get("role") not in _STAFF_CONFIRM_ROLES:
+                await cb.answer("❌ Доступно только менеджерам и администраторам", show_alert=True)
                 return
             staff_name = f"{staff.get('first_name','')} {staff.get('last_name','')}".strip() or wname
-            # Редактируем сообщение в канале — оставляем только 📋 История
-            branch, msg_ids = await get_route_delivery_info(order_id)
-            ch_key = "delivery_channel_navoi_id" if branch == "navoi" else "delivery_channel_zarafshan_id"
-            channel_id = int(SITE.get(ch_key) or "0")
-            ch_msg_id  = msg_ids.get(str(order_id))
-            if channel_id and ch_msg_id:
-                final_kb = InlineKeyboardMarkup(inline_keyboard=[[
-                    InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
-                ]])
-                try:
-                    await bot.edit_message_reply_markup(
-                        chat_id=channel_id, message_id=int(ch_msg_id), reply_markup=final_kb)
-                except Exception as e:
-                    logging.warning(f"confirm_receive channel edit: {e}")
-            # Обновляем уведомление в группе
-            try:
-                await cb.message.edit_text(
-                    orig + f"\n✅ Подтверждено: {staff_name}",
-                    reply_markup=InlineKeyboardMarkup(inline_keyboard=[]),
-                    parse_mode="HTML")
-            except Exception: pass
-            await cb.answer("✅ Приём подтверждён!")
+            await update_order_status_by_id(order_id, "washing", by_tg_id=w.id, by_name=staff_name,
+                                            note="Подтверждён приём в мастерской")
+            final_kb = InlineKeyboardMarkup(inline_keyboard=[[
+                InlineKeyboardButton(text="📋 История", callback_data=f"rp:{order_id}:history")
+            ]])
+            await cb.message.edit_reply_markup(reply_markup=final_kb)
+            await cb.answer(f"✅ Принято! Статус → Стирка")
             return
 
         # ── Статусные действия водителя ───────────────────────────────
@@ -2393,7 +2400,11 @@ async def route_pickup_cb(cb: CallbackQuery):
             if cur != "confirmed":
                 await cb.answer(f"ℹ️ {_ROUTE_STATUS_RU.get(cur, cur)}")
                 return
-            new_status, toast = "pickup", "✅ Забрал"
+            qty_text = orig + _QTY_SEP
+            await cb.message.edit_text(qty_text, reply_markup=_qty_kb(order_id),
+                                       parse_mode="HTML", disable_web_page_preview=True)
+            await cb.answer("Укажите количество изделий")
+            return
 
         elif action == "undo":
             if cur != "pickup":
@@ -2419,30 +2430,9 @@ async def route_pickup_cb(cb: CallbackQuery):
 
         await update_order_status_by_id(order_id, new_status, by_tg_id=w.id, by_name=wname,
                                         note=f"Маршрут: {toast}")
-
         await cb.message.edit_text(orig, reply_markup=_route_pickup_kb(order_id, new_status),
                                    parse_mode="HTML", disable_web_page_preview=True)
         await cb.answer(toast)
-
-        # ── После «Сдал» — уведомить менеджеров ─────────────────────
-        if action == "deliver":
-            order_num = (order.get("order_num","") or "").replace("ARTEZ-","")
-            addr = order.get("location_address") or order.get("address","") or ""
-            notify_text = (
-                f"🏭 Водитель сдал в мастерскую\n"
-                f"📦 {order_num}" + (f" · 📍{addr}" if addr else "") + f"\n"
-                f"👤 {wname}"
-            )
-            notify_kb = InlineKeyboardMarkup(inline_keyboard=[[
-                InlineKeyboardButton(text="✅ Подтвердить", callback_data=f"rp:{order_id}:confirm_receive"),
-                InlineKeyboardButton(text="↩️ Вернуть", callback_data=f"rp:{order_id}:undo_deliver"),
-            ]])
-            branch = order.get("branch","")
-            admin_group = _group_id_for_branch(branch)
-            try:
-                await bot.send_message(admin_group, notify_text, reply_markup=notify_kb)
-            except Exception as e:
-                logging.warning(f"deliver notify error: {e}")
 
     except Exception as e:
         logging.warning(f"route_pickup_cb error: {e}")
